@@ -1,44 +1,112 @@
 import os
+import subprocess
 import tempfile
 from io import BytesIO
+from unittest import mock
 
-from PIL import Image
+import pytest
+
+from HeifImagePlugin import Image
 
 from . import avg_diff
 
 
-def test_save_to_filename(fox_small_image):
+def compare_with_original(fp, original, threshold=10, max_diff=0.02):
+    image = Image.open(fp)
+    assert image.format == 'HEIF', 'format'
+    avg_diffs = avg_diff(image, original, threshold=threshold)
+    assert max(avg_diffs) <= max_diff, 'diff'
+
+
+def test_save_to_filename(jungle_ref_image):
     f, filename = tempfile.mkstemp('.avif')
     os.close(f)
     try:
-        fox_small_image.save(filename)
-        image = Image.open(filename)
-        assert image.format == 'HEIF'
-        avg_diffs = avg_diff(image, fox_small_image, threshold=10)
-        assert max(avg_diffs) <= 0.02
+        jungle_ref_image.save(filename)
+        compare_with_original(filename, jungle_ref_image)
     finally:
         os.unlink(filename)
 
 
-def test_save_to_fp(fox_small_image):
+def test_save_to_fp(jungle_ref_image):
     f, filename = tempfile.mkstemp('.avif')
     os.close(f)
     try:
         with open(filename, 'wb') as fp:
-            fox_small_image.save(fp)
-        image = Image.open(filename)
-        assert image.format == 'HEIF'
-        avg_diffs = avg_diff(image, fox_small_image, threshold=10)
-        assert max(avg_diffs) <= 0.02
+            jungle_ref_image.save(fp)
+        compare_with_original(filename, jungle_ref_image)
     finally:
         os.unlink(filename)
 
 
-def test_save_to_bytesio(fox_small_image):
+def test_save_to_bytesio(jungle_ref_image):
     with BytesIO() as fp:
-        fox_small_image.save(fp, format='HEIF', avif=True)
-        fp.seek(0)
-        image = Image.open(fp)
-        assert image.format == 'HEIF'
-        avg_diffs = avg_diff(image, fox_small_image, threshold=10)
-        assert max(avg_diffs) <= 0.02
+        jungle_ref_image.save(fp, 'HEIF', avif=True)
+        compare_with_original(fp, jungle_ref_image)
+
+
+def test_encoder(jungle_ref_image):
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, encoder='aom')
+        compare_with_original(fp, jungle_ref_image)
+
+
+def test_quality(jungle_ref_image):
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, quality=10)
+        with pytest.raises(AssertionError, match='diff'):
+            # Should fail with quality=10
+            compare_with_original(fp, jungle_ref_image, threshold=0)
+
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, quality=90)
+        # Should be ok for quality=90
+        compare_with_original(fp, jungle_ref_image, threshold=0)
+
+
+def test_subsampling(jungle_ref_image):
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, quality=90, subsampling=2)
+        with pytest.raises(AssertionError, match='diff'):
+            # Should fail with subsampling=2
+            compare_with_original(fp, jungle_ref_image, threshold=0, max_diff=0.01)
+
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, quality=90, subsampling=0)
+        # Should be ok for subsampling=0
+        compare_with_original(fp, jungle_ref_image, threshold=0, max_diff=0.01)
+
+    for subsampling in [1, '444', '422', '420']:
+        with BytesIO() as fp:
+            jungle_ref_image.save(fp, 'HEIF', avif=True, subsampling=subsampling)
+
+
+def test_speed(jungle_ref_image):
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, speed=9)
+        compare_with_original(fp, jungle_ref_image)
+        speed_9_len = fp.tell()
+
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, speed=5)
+        compare_with_original(fp, jungle_ref_image)
+        speed_5_len = fp.tell()
+
+    assert speed_5_len != speed_9_len
+
+
+def test_concurrency(jungle_ref_image):
+    with BytesIO() as fp:
+        with pytest.raises(subprocess.CalledProcessError):
+            jungle_ref_image.save(fp, 'HEIF', avif=True, concurrency='please')
+
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, concurrency=1)
+        compare_with_original(fp, jungle_ref_image)
+
+
+@mock.patch('HeifImagePlugin.HEIF_ENC_BIN', new='ensure_not_found')
+def test_binary_not_found(jungle_ref_image):
+    with BytesIO() as fp:
+        with pytest.raises(FileNotFoundError, match=r'HeifImagePlugin\.HEIF_ENC_BIN'):
+            jungle_ref_image.save(fp, 'HEIF', avif=True)

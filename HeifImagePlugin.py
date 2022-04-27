@@ -212,7 +212,7 @@ def _save(im, fp, filename):
                     raise subprocess.CalledProcessError(enc.returncode, cmd)
         except FileNotFoundError:
             raise FileNotFoundError(
-                2, f"Can't find heif encoding binary file. Install `'{HEIF_ENC_BIN}'` "
+                2, f"Can't find heif encoding binary. Install '{HEIF_ENC_BIN}' "
                 + "or set `HeifImagePlugin.HEIF_ENC_BIN` to full path.")
 
 

@@ -15,5 +15,5 @@ def fox_ref_image():
 
 
 @pytest.fixture(scope="session")
-def fox_small_image(fox_ref_image):
-    return fox_ref_image.resize((256, 170), Image.BICUBIC)
+def jungle_ref_image(fox_ref_image):
+    return Image.open(respath('jungle.png'))
