@@ -17,3 +17,8 @@ def fox_ref_image():
 @pytest.fixture(scope="session")
 def jungle_ref_image(fox_ref_image):
     return Image.open(respath('jungle.png'))
+
+
+@pytest.fixture(scope="session")
+def dices_ref_image(fox_ref_image):
+    return Image.open(respath('dices.png'))

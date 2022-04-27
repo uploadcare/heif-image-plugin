@@ -16,6 +16,14 @@ def compare_with_original(fp, original, threshold=10, max_diff=0.02):
     assert image.format == 'HEIF', 'format'
     avg_diffs = avg_diff(image, original, threshold=threshold)
     assert max(avg_diffs) <= max_diff, 'diff'
+    return image
+
+
+@mock.patch('HeifImagePlugin.HEIF_ENC_BIN', new='ensure_not_found')
+def test_binary_not_found(jungle_ref_image):
+    with BytesIO() as fp:
+        with pytest.raises(FileNotFoundError, match=r'HeifImagePlugin\.HEIF_ENC_BIN'):
+            jungle_ref_image.save(fp, 'HEIF', avif=True)
 
 
 def test_save_to_filename(jungle_ref_image):
@@ -42,7 +50,10 @@ def test_save_to_fp(jungle_ref_image):
 def test_save_to_bytesio(jungle_ref_image):
     with BytesIO() as fp:
         jungle_ref_image.save(fp, 'HEIF', avif=True)
-        compare_with_original(fp, jungle_ref_image)
+        image = compare_with_original(fp, jungle_ref_image)
+
+    assert image.info.get('icc_profile')
+    assert image.info['icc_profile'] == jungle_ref_image.info['icc_profile']
 
 
 def test_encoder(jungle_ref_image):
@@ -105,8 +116,10 @@ def test_concurrency(jungle_ref_image):
         compare_with_original(fp, jungle_ref_image)
 
 
-@mock.patch('HeifImagePlugin.HEIF_ENC_BIN', new='ensure_not_found')
-def test_binary_not_found(jungle_ref_image):
+@pytest.mark.parametrize('mode', ['RGB', 'RGBA', 'L', 'LA'])
+def test_modes(mode, dices_ref_image):
+    ref = dices_ref_image.convert(mode)
     with BytesIO() as fp:
-        with pytest.raises(FileNotFoundError, match=r'HeifImagePlugin\.HEIF_ENC_BIN'):
-            jungle_ref_image.save(fp, 'HEIF', avif=True)
+        ref.save(fp, 'HEIF', avif=True)
+        # Coerce ref mode to RGB since loader don't work with L
+        compare_with_original(fp, ref.convert('RGBA' if 'A' in mode else 'RGB'))
