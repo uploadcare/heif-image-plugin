@@ -137,3 +137,8 @@ def test_not_load_truncated():
 def test_load_truncated():
     image = Image.open(respath('test-crop.heic'))
     image.load()
+
+
+def test_verify():
+    image = Image.open(respath('test-crop.heic'))
+    image.verify()
