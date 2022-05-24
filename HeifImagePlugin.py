@@ -165,6 +165,10 @@ def _save(im, fp, filename):
     # Save it before subsequent im.save() call
     info = im.encoderinfo
 
+    if im.mode in ('P', 'PA'):
+        # disbled due to errors in libheif encoder
+        raise IOError("cannot write mode P as HEIF")
+
     with tempfile.NamedTemporaryFile(suffix='.png') as tmpfile:
         im.save(
             tmpfile, format='PNG', optimize=False, compress_level=0,

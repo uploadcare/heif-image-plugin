@@ -117,9 +117,16 @@ def test_concurrency(jungle_ref_image):
 
 
 @pytest.mark.parametrize('mode', ['RGB', 'RGBA', 'L', 'LA'])
-def test_modes(mode, dices_ref_image):
+def test_good_modes(mode, dices_ref_image):
     ref = dices_ref_image.convert(mode)
     with BytesIO() as fp:
         ref.save(fp, 'HEIF', avif=True)
         # Coerce ref mode to RGB since loader don't work with L
         compare_with_original(fp, ref.convert('RGBA' if 'A' in mode else 'RGB'))
+
+
+def test_deny_palette_mode(dices_ref_image):
+    ref = dices_ref_image.convert('P', palette=Image.ADAPTIVE)
+    with BytesIO() as fp:
+        with pytest.raises(OSError):
+            ref.save(fp, 'HEIF', avif=True)
