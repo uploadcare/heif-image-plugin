@@ -104,10 +104,6 @@ class HeifImageFile(ImageFile.ImageFile):
 
         _extract_heif_exif(heif_file)
 
-        if self._exclusive_fp:
-            self.fp.close()
-        self.fp = None
-
         if pyheif_supports_transformations:
             heif_file = _rotate_heif_file(heif_file)
             self._size = heif_file.transformations['crop'][2:4]
