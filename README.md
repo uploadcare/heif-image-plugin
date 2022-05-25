@@ -42,6 +42,12 @@ This is not a big library but if you want to contribute is very easy!
 
 ## Changelog
 
+### 0.5.0
+
+* Added HEIF saving support if `heif-enc` is installed (part of libheif)
+* Fixed `HeifImageFile.verify()` call
+* Extensions .heic, .avif, .heif, .hif are handled by the plugin
+
 ### 0.4.0
 
 * Bypass some decoding errors when `ImageFile.LOAD_TRUNCATED_IMAGES` is True.
