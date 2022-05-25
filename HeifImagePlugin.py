@@ -218,5 +218,9 @@ def _save(im, fp, filename):
 
 Image.register_open(HeifImageFile.format, HeifImageFile, check_heif_magic)
 Image.register_save(HeifImageFile.format, _save)
-Image.register_extensions(HeifImageFile.format, [".heic", ".avif"])
 Image.register_mime(HeifImageFile.format, 'image/heif')
+Image.register_extensions(HeifImageFile.format, [".heic", ".avif"])
+
+# Don't use this extensions for saving images, use the ones above.
+# They have added for quick file type detection only (i.g. by Django).
+Image.register_extensions(HeifImageFile.format, [".heif", ".hif"])
