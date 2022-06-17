@@ -166,6 +166,9 @@ def _save(im, fp, filename):
         raise IOError("cannot write mode P as HEIF")
 
     with tempfile.NamedTemporaryFile(suffix='.png') as tmpfile:
+        if im.mode == '1':
+            # to circumvent `heif-enc` bug
+            im = im.convert('L')
         im.save(
             tmpfile, format='PNG', optimize=False, compress_level=0,
             icc_profile=info.get('icc_profile', im.info.get('icc_profile')),

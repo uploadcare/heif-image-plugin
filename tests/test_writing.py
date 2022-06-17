@@ -116,7 +116,7 @@ def test_concurrency(jungle_ref_image):
         compare_with_original(fp, jungle_ref_image)
 
 
-@pytest.mark.parametrize('mode', ['RGB', 'RGBA', 'L', 'LA'])
+@pytest.mark.parametrize('mode', ['RGB', 'RGBA', 'L', 'LA', '1'])
 def test_good_modes(mode, dices_ref_image):
     ref = dices_ref_image.convert(mode)
     with BytesIO() as fp:
