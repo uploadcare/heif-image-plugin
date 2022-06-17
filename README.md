@@ -42,6 +42,10 @@ This is not a big library but if you want to contribute is very easy!
 
 ## Changelog
 
+### 0.5.1
+
+* Fixed HEIF saving in '1' mode
+
 ### 0.5.0
 
 * Added HEIF saving support if `heif-enc` is installed (part of libheif)
