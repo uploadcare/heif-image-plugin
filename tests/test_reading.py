@@ -6,7 +6,7 @@ import pytest
 from PIL import Image, ImageCms, ImageOps
 from pyheif.error import HeifError
 
-from HeifImagePlugin import check_heif_magic, pyheif_supports_transformations
+from HeifImagePlugin import check_heif_magic, Transformations
 
 from . import avg_diff, respath
 
@@ -69,7 +69,8 @@ def test_open_image_metadata(open_mock):
     m.size = (10, 20)
     m.mode = 'RGB'
     m.data = b'rgb' * 10 * 20
-    m.transformations = {'crop': (0, 0, 10, 20), 'orientation_tag': 0}
+    if Transformations is not None:
+        m.transformations = Transformations(10, 20)
     m.metadata = [
         {'type': 'foo', 'data': 'bar'},
         {'type': 'bar', 'data': 'foo'},
@@ -94,14 +95,14 @@ def test_check_heif_magic(magic):
 
 
 def test_check_heif_magic_wrong():
-    assert not check_heif_magic(b'    ftyphey!    ')
+    assert not check_heif_magic(b'    fytphey!    ')
 
 
 @pytest.mark.parametrize('orientation', list(range(1, 9)))
 def test_orientation(orientation, orientation_ref_image):
     image = Image.open(respath('orientation', f'Landscape_{orientation}.heic'))
 
-    if pyheif_supports_transformations:
+    if Transformations is not None:
         # There should be exif in each image, even if Orientation is 0
         assert 'exif' in image.info
 
@@ -116,7 +117,7 @@ def test_orientation(orientation, orientation_ref_image):
     transposed = ImageOps.exif_transpose(image)
     assert transposed.size == (600, 450)
 
-    if pyheif_supports_transformations:
+    if Transformations is not None:
         # Image should change after transposition
         if orientation != 1:
             assert image != transposed

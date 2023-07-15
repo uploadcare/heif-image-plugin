@@ -29,17 +29,17 @@ install-pyheif-latest-pillow-latest:
 install-pyheif-latest-pillow-prod:
 	sudo apt install --no-install-recommends -y libjpeg-dev
 	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-cmyk16bit#egg=pillow
+		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-tiff-double-free#egg=pillow
 
 
 .PHONY: install-pyheif-prod-pillow-latest install-pyheif-prod-pillow-prod
 
 install-pyheif-prod-pillow-latest:
 	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pyheif.git@0.6.1-prod#egg=pyheif
+		-e git+https://github.com/uploadcare/pyheif.git@read-transformations#egg=pyheif
 
 install-pyheif-prod-pillow-prod:
 	sudo apt install --no-install-recommends -y libjpeg-dev
 	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-cmyk16bit#egg=pillow \
-		-e git+https://github.com/uploadcare/pyheif.git@0.6.1-prod#egg=pyheif
+		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-tiff-double-free#egg=pillow \
+		-e git+https://github.com/uploadcare/pyheif.git@read-transformations#egg=pyheif
