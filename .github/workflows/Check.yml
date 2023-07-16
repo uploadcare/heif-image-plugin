@@ -20,8 +20,9 @@ jobs:
     - name: Install system dependencies
       run: |
         BUCKET=https://uploadcare-packages.s3.amazonaws.com
-        curl -fLO $BUCKET/libheif/libheif-uc_1.14.2-2a1fc34-ab9f3b1_amd64.deb
+        curl -fLO $BUCKET/libheif/libheif-uc_1.16.2-6ee6762-3f6b709_$(dpkg --print-architecture).deb
         sudo dpkg -i *.deb && rm *.deb
+        sudo apt install --no-install-recommends -y libjpeg-dev
     - name: Install dependencies
       run: make install-pyheif-${{ matrix.pyheif }}-pillow-${{ matrix.pillow }}
     - name: Check
