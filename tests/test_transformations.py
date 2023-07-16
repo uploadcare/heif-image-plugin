@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 from pyheif import open as pyheif_open
 
-from HeifImagePlugin import Transformations, HeifImageFile
+from HeifImagePlugin import Transformations
 
 from . import respath
 

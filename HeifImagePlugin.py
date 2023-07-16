@@ -8,6 +8,8 @@ import pyheif
 from cffi import FFI
 from PIL import Image, ImageFile
 from pyheif.error import HeifError
+
+
 try:
     from pyheif.transformations import Transformations
 except ImportError:

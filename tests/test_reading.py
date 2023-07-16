@@ -6,7 +6,7 @@ import pytest
 from PIL import Image, ImageCms, ImageOps
 from pyheif.error import HeifError
 
-from HeifImagePlugin import check_heif_magic, Transformations
+from HeifImagePlugin import Transformations, check_heif_magic
 
 from . import avg_diff, respath
 
