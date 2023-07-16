@@ -7,7 +7,7 @@ jobs:
     timeout-minutes: 3
     strategy:
       matrix:
-        python: ['3.7', '3.10']
+        python: ['3.8', '3.11']
         pillow: [prod, latest]
         pyheif: [prod, latest]
 
