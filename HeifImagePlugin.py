@@ -194,6 +194,11 @@ def _save(im, fp, filename):
         if info.get('quality') is not None:
             cmd.extend(['-q', str(info['quality'])])
 
+        if info.get('downsampling') is not None:
+            if info['downsampling'] not in ('nn', 'average', 'sharp-yuv'):
+                raise ValueError(f"Unknown downsampling: {info['downsampling']}")
+            cmd.extend(['-C', info['downsampling']])
+
         subsampling = info.get('subsampling')
         if subsampling is not None:
             if subsampling == 0:
