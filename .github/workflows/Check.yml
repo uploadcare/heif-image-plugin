@@ -23,6 +23,8 @@ jobs:
         curl -fLO $BUCKET/libheif/libheif-uc_1.16.2-6ee6762-3f6b709_$(dpkg --print-architecture).deb
         sudo dpkg -i *.deb && rm *.deb
         sudo apt install --no-install-recommends -y libjpeg-dev
+    - name: Update pip
+      run: pip install pip==23.2.1
     - name: Install dependencies
       run: make install-pyheif-${{ matrix.pyheif }}-pillow-${{ matrix.pillow }}
     - name: Check
