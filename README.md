@@ -42,6 +42,12 @@ This is not a big library but if you want to contribute is very easy!
 
 ## Changelog
 
+### 0.6.0
+
+* Minimal supported pyheif is 0.7.1
+* Added `downsampling` parameter for saving. Works only with `subsampling` == 2.
+* Transformations support updated to the latest libheif and pyheif
+
 ### 0.5.1
 
 * Fixed HEIF saving in '1' mode

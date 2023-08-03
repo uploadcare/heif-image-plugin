@@ -4,7 +4,7 @@ import os.path
 from setuptools import setup
 
 
-__version__ = '0.5.1'
+__version__ = '0.6.0'
 
 github_url = 'https://github.com/uploadcare'
 package_name = 'heif-image-plugin'
