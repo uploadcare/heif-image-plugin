@@ -26,7 +26,7 @@ setup(
     download_url='%s/%s/archive/v%s.tar.gz' % (github_url, package_name, __version__),
     keywords=['heif', 'heic', 'Pillow', 'plugin', 'pyhief'],
     install_requires=[
-        "pyheif>=0.6.1",
+        "pyheif>=0.7.1",
         "piexif>=1.1.3",
     ],
     extras_require={

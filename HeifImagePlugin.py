@@ -1,4 +1,3 @@
-import inspect
 import subprocess
 import tempfile
 from copy import copy
@@ -11,17 +10,20 @@ from PIL import Image, ImageFile
 from pyheif.error import HeifError
 
 
+try:
+    from pyheif.transformations import Transformations
+except ImportError:
+    Transformations = None
+
+
 ffi = FFI()
 _keep_refs = WeakKeyDictionary()
-pyheif_supports_transformations = (
-    'transformations' in inspect.signature(pyheif.HeifFile).parameters
-)
 HEIF_ENC_BIN = 'heif-enc'
 
 
 def _crop_heif_file(heif):
     # Zero-copy crop before loading. Just shifts data pointer and updates meta.
-    crop = heif.transformations['crop']
+    crop = heif.transformations.crop
     if crop == (0, 0) + heif.size:
         return heif
 
@@ -40,7 +42,8 @@ def _crop_heif_file(heif):
 
     new_heif = copy(heif)
     new_heif.size = crop[2:4]
-    new_heif.transformations = dict(heif.transformations, crop=(0, 0) + crop[2:4])
+    new_heif.transformations = copy(heif.transformations)
+    new_heif.transformations.crop = (0, 0) + crop[2:4]
     new_heif.data = data
     return new_heif
 
@@ -56,7 +59,7 @@ def _rotate_heif_file(heif):
     And we come up to there is no reasons to force rotation of HEIF images
     after loading since we need update EXIF anyway.
     """
-    orientation = heif.transformations['orientation_tag']
+    orientation = heif.transformations.orientation_tag
     if not (1 <= orientation <= 8):
         return heif
 
@@ -69,7 +72,8 @@ def _rotate_heif_file(heif):
             pass
 
     new_heif = copy(heif)
-    new_heif.transformations = dict(heif.transformations, orientation_tag=0)
+    new_heif.transformations = copy(heif.transformations)
+    new_heif.transformations.orientation_tag = 0
     new_heif.exif = piexif.dump(exif)
     return new_heif
 
@@ -98,15 +102,15 @@ class HeifImageFile(ImageFile.ImageFile):
     def _open(self):
         try:
             heif_file = pyheif.open(
-                self.fp, apply_transformations=not pyheif_supports_transformations)
+                self.fp, apply_transformations=Transformations is None)
         except HeifError as e:
             raise SyntaxError(str(e))
 
         _extract_heif_exif(heif_file)
 
-        if pyheif_supports_transformations:
+        if Transformations is not None:
             heif_file = _rotate_heif_file(heif_file)
-            self._size = heif_file.transformations['crop'][2:4]
+            self._size = heif_file.transformations.crop[2:4]
         else:
             self._size = heif_file.size
 
@@ -144,7 +148,7 @@ class HeifImageFile(ImageFile.ImageFile):
             self.load_prepare()
 
             if heif_file.data:
-                if pyheif_supports_transformations:
+                if Transformations is not None:
                     heif_file = _crop_heif_file(heif_file)
                 self.frombytes(heif_file.data, "raw", (self.mode, heif_file.stride))
 
@@ -189,6 +193,11 @@ def _save(im, fp, filename):
 
         if info.get('quality') is not None:
             cmd.extend(['-q', str(info['quality'])])
+
+        if info.get('downsampling') is not None:
+            if info['downsampling'] not in ('nn', 'average', 'sharp-yuv'):
+                raise ValueError(f"Unknown downsampling: {info['downsampling']}")
+            cmd.extend(['-C', info['downsampling']])
 
         subsampling = info.get('subsampling')
         if subsampling is not None:

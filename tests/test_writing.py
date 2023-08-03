@@ -75,6 +75,27 @@ def test_quality(jungle_ref_image):
         compare_with_original(fp, jungle_ref_image, threshold=0)
 
 
+def test_downsampling(jungle_ref_image):
+    with BytesIO() as fp:
+        with pytest.raises(ValueError, match='Unknown'):
+            jungle_ref_image.save(fp, 'HEIF', avif=True, downsampling=2)
+
+    def get_diff_for_downsampling(downsampling):
+        with BytesIO() as fp:
+            jungle_ref_image.save(fp, 'HEIF', avif=True,
+                                  quality=90, subsampling=2, downsampling=downsampling)
+            return sum(avg_diff(Image.open(fp), jungle_ref_image))
+
+    default_diff = get_diff_for_downsampling(None)
+    nn_diff = get_diff_for_downsampling('nn')
+    average_diff = get_diff_for_downsampling('average')
+    sharp_diff = get_diff_for_downsampling('sharp-yuv')
+
+    assert nn_diff == default_diff, "nn should be default"
+    assert average_diff != default_diff
+    assert sharp_diff not in (default_diff, average_diff)
+
+
 def test_subsampling(jungle_ref_image):
     with BytesIO() as fp:
         jungle_ref_image.save(fp, 'HEIF', avif=True, quality=90, subsampling=2)

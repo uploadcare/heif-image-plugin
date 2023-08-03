@@ -4,13 +4,13 @@ import pytest
 from PIL import Image
 from pyheif import open as pyheif_open
 
-from HeifImagePlugin import pyheif_supports_transformations
+from HeifImagePlugin import Transformations
 
 from . import respath
 
 
 skip_if_no_transformations = pytest.mark.skipif(
-    not pyheif_supports_transformations,
+    Transformations is None,
     reason="pyheif doesn't support transformations")
 
 
@@ -27,10 +27,11 @@ def open_with_custom_meta(path, *, exif_data=None, exif=None, crop=None, orienta
             heif.metadata = [{'type': 'Exif', 'data': exif_data}]
         else:
             heif.metadata = None
-        heif.transformations = {
-            'crop': crop if crop else (0, 0) + heif.size,
-            'orientation_tag': orientation,
-        }
+        if Transformations is not None:
+            heif.transformations = Transformations(*heif.size)
+            heif.transformations.orientation_tag = orientation
+            if crop:
+                heif.transformations.crop = crop
         return heif
 
     with mock.patch('pyheif.open') as open_mock:

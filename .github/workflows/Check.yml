@@ -7,7 +7,7 @@ jobs:
     timeout-minutes: 3
     strategy:
       matrix:
-        python: ['3.7', '3.10']
+        python: ['3.8', '3.11']
         pillow: [prod, latest]
         pyheif: [prod, latest]
 
@@ -20,8 +20,11 @@ jobs:
     - name: Install system dependencies
       run: |
         BUCKET=https://uploadcare-packages.s3.amazonaws.com
-        curl -fLO $BUCKET/libheif/libheif-uc_1.14.2-2a1fc34-ab9f3b1_amd64.deb
+        curl -fLO $BUCKET/libheif/libheif-uc_1.16.2-6ee6762-3f6b709_$(dpkg --print-architecture).deb
         sudo dpkg -i *.deb && rm *.deb
+        sudo apt install --no-install-recommends -y libjpeg-dev
+    - name: Update pip
+      run: pip install pip==23.2.1
     - name: Install dependencies
       run: make install-pyheif-${{ matrix.pyheif }}-pillow-${{ matrix.pillow }}
     - name: Check
