@@ -114,7 +114,7 @@ class HeifImageFile(ImageFile.ImageFile):
         else:
             self._size = heif_file.size
 
-        self.mode = heif_file.mode
+        self._mode = heif_file.mode
 
         if heif_file.exif:
             self.info['exif'] = heif_file.exif
