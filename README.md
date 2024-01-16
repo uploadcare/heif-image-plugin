@@ -42,6 +42,10 @@ This is not a big library but if you want to contribute is very easy!
 
 ## Changelog
 
+### 0.6.1
+
+* Added compatibility with Pillow 10.1+
+
 ### 0.6.0
 
 * Minimal supported pyheif is 0.7.1
