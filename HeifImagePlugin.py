@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 from copy import copy
+from dataclasses import dataclass
 from weakref import WeakKeyDictionary
 
 import piexif
@@ -16,6 +17,22 @@ except ImportError:
     Transformations = None
 
 
+@dataclass
+class LibheifError:
+    code: int
+    subcode: int
+
+    def __eq__(self, e):
+        if not isinstance(e, HeifError):  # pragma: no cover
+            return False
+        return e.code == self.code and e.subcode == self.subcode
+
+
+class Errors:
+    end_of_file = LibheifError(7, 100)
+    unsupported_color_conversion = LibheifError(4, 3003)
+
+
 ffi = FFI()
 _keep_refs = WeakKeyDictionary()
 HEIF_ENC_BIN = 'heif-enc'
@@ -27,7 +44,7 @@ def _crop_heif_file(heif):
     if crop == (0, 0) + heif.size:
         return heif
 
-    if heif.mode not in ("L", "RGB", "RGBA"):
+    if heif.mode not in ("L", "RGB", "RGBA"):  # pragma: no cover
         raise ValueError("Unknown mode")
     pixel_size = len(heif.mode)
 
@@ -151,7 +168,7 @@ class HeifImageFile(ImageFile.ImageFile):
                 try:
                     heif_file = heif_file.load()
                 except HeifError as e:
-                    if not (e.code == 4 and e.subcode == 3003):
+                    if e != Errors.unsupported_color_conversion:
                         raise
                     # Unsupported feature: Unsupported color conversion
                     # https://github.com/strukturag/libheif/issues/1273
@@ -159,7 +176,7 @@ class HeifImageFile(ImageFile.ImageFile):
                     heif_file = self._open_heif_file(True).load()
             except HeifError as e:
                 # Ignore EOF error and return blank image otherwise
-                cropped_file = e.code == 7 and e.subcode == 100
+                cropped_file = e == Errors.end_of_file
                 if not cropped_file or not ImageFile.LOAD_TRUNCATED_IMAGES:
                     raise
 
