@@ -99,20 +99,20 @@ class HeifImageFile(ImageFile.ImageFile):
     format = 'HEIF'
     format_description = "HEIF/HEIC image"
 
-    def _open(self):
+    def _open_heif_file(self, apply_transformations):
         try:
             heif_file = pyheif.open(
-                self.fp, apply_transformations=Transformations is None)
+                self.fp, apply_transformations=apply_transformations)
         except HeifError as e:
             raise SyntaxError(str(e))
 
         _extract_heif_exif(heif_file)
 
-        if Transformations is not None:
+        if apply_transformations:
+            self._size = heif_file.size
+        else:
             heif_file = _rotate_heif_file(heif_file)
             self._size = heif_file.transformations.crop[2:4]
-        else:
-            self._size = heif_file.size
 
         if hasattr(self, "_mode"):
             self._mode = heif_file.mode
@@ -120,6 +120,9 @@ class HeifImageFile(ImageFile.ImageFile):
             # Fallback for Pillow < 10.1.0
             # https://pillow.readthedocs.io/en/stable/releasenotes/10.1.0.html#setting-image-mode
             self.mode = heif_file.mode
+
+        self.info.pop('exif', None)
+        self.info.pop('icc_profile', None)
 
         if heif_file.exif:
             self.info['exif'] = heif_file.exif
@@ -135,20 +138,30 @@ class HeifImageFile(ImageFile.ImageFile):
             # We need to go deeper...
             if heif_file.color_profile['type'] in ('rICC', 'prof'):
                 self.info['icc_profile'] = heif_file.color_profile['data']
+        return heif_file
 
+    def _open(self):
         self.tile = []
-        self.heif_file = heif_file
+        self.heif_file = self._open_heif_file(Transformations is None)
 
     def load(self):
         heif_file, self.heif_file = self.heif_file, None
         if heif_file:
             try:
-                heif_file = heif_file.load()
+                try:
+                    heif_file = heif_file.load()
+                except HeifError as e:
+                    if not (e.code == 4 and e.subcode == 3003):
+                        raise
+                    # Unsupported feature: Unsupported color conversion
+                    # https://github.com/strukturag/libheif/issues/1273
+                    self.fp.seek(0)
+                    heif_file = self._open_heif_file(True).load()
             except HeifError as e:
+                # Ignore EOF error and return blank image otherwise
                 cropped_file = e.code == 7 and e.subcode == 100
                 if not cropped_file or not ImageFile.LOAD_TRUNCATED_IMAGES:
                     raise
-                # Ignore EOF error and return blank image otherwise
 
             self.load_prepare()
 
