@@ -2,7 +2,7 @@ on: [push]
 
 jobs:
   check:
-    name: py${{ matrix.python }} pillow-${{ matrix.pillow }} libheif-${{ matrix.libheif }}
+    name: py${{ matrix.python }} pillow-${{ matrix.pillow }} libheif-${{ matrix.libheif }} pyheif-${{ matrix.pyheif }}
     runs-on: ubuntu-20.04
     timeout-minutes: 3
     strategy:
@@ -10,6 +10,10 @@ jobs:
         python: ['3.8', '3.11']
         pillow: [prod, latest]
         libheif: ['1.16.2-6ee6762-3f6b709', '1.18.2-bf35e9e-47f4fc0']
+        include:
+          - python: '3.8'
+            libheif: '1.16.2-6ee6762-3f6b709'
+            pyheif: '0.7.1'
 
     steps:
     - uses: actions/checkout@v2
@@ -27,6 +31,11 @@ jobs:
       run: pip install pip==23.2.1
     - name: Install dependencies
       run: make install-pillow-${{ matrix.pillow }}
+    - name: Install ovsolete pyheif
+      if: ${{ matrix.pyheif }}
+      run: |
+        pip uninstall -y pyheif
+        pip install pyheif==${{ matrix.pyheif }}
     - name: Check
       run: make check
     - name: Upload coverage to Codecov
