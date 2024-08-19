@@ -26,16 +26,16 @@ install-pyheif-latest-pillow-latest:
 .PHONY: install-pyheif-latest-pillow-prod
 install-pyheif-latest-pillow-prod:
 	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-tiff-double-free#egg=pillow
+		-e git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-png-truncated#egg=pillow
 
 
 .PHONY: install-pyheif-prod-pillow-latest
 install-pyheif-prod-pillow-latest:
 	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pyheif.git@read-transformations#egg=pyheif
+		-e git+https://github.com/uploadcare/pyheif.git@v0.8.0-transforms#egg=pyheif
 
 .PHONY: install-pyheif-prod-pillow-prod
 install-pyheif-prod-pillow-prod:
 	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-tiff-double-free#egg=pillow \
-		-e git+https://github.com/uploadcare/pyheif.git@read-transformations#egg=pyheif
+		-e git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-png-truncated#egg=pillow \
+		-e git+https://github.com/uploadcare/pyheif.git@v0.8.0-transforms#egg=pyheif
