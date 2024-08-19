@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked set -ex \
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked set -ex \
     && apt-get install --no-install-recommends -y \
         python3-dev libpng-dev libjpeg-dev \
-    && pip install --no-cache-dir -U pip
+    && pip install --no-cache-dir -U pip setuptools
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked set -ex \
     && BUCKET=https://uploadcare-packages.s3.amazonaws.com \
