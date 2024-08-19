@@ -10,9 +10,11 @@ jobs:
         python: ['3.8', '3.11']
         pillow: [prod, latest]
         libheif: ['1.16.2-6ee6762-3f6b709', '1.18.2-bf35e9e-47f4fc0']
-        include:
-          - python: '3.8'
-            libheif: '1.16.2-6ee6762-3f6b709'
+        pyheif: ['', '0.7.1']
+        exclude:
+          - python: '3.11'
+            pyheif: '0.7.1'
+          - libheif: '1.18.2-bf35e9e-47f4fc0'
             pyheif: '0.7.1'
 
     steps:
