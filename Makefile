@@ -1,4 +1,4 @@
-.PHONY: clean lint commit check
+.PHONY: clean lint commit check docker_build docker_shell
 
 xargs=$(if $(shell xargs -r </dev/null 2>/dev/null && echo 1), xargs -r, xargs)
 
@@ -18,6 +18,11 @@ commit:
 check: clean
 	pytest --cov=. --cov-report=xml tests
 
+docker_build:
+	docker build --platform=linux/amd64 -t heif-image-plugin:latest .
+
+docker_shell: docker_build
+	docker run --platform=linux/amd64 --rm -it -v .:/src heif-image-plugin:latest
 
 .PHONY: install-pyheif-latest-pillow-latest
 install-pyheif-latest-pillow-latest:
