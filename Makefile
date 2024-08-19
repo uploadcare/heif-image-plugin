@@ -8,13 +8,11 @@ clean:
 
 lint: clean
 	isort --diff HeifImagePlugin.py ./tests
-	pycodestyle HeifImagePlugin.py ./tests
 	flake8 HeifImagePlugin.py ./tests
 
 GIT_DIFF=git diff --name-only --cached --diff-filter=dt
 commit:
 	${GIT_DIFF} -- '*.py' | $(xargs) isort --diff
-	${GIT_DIFF} -- '*.py' | $(xargs) pycodestyle
 	${GIT_DIFF} -- '*.py' | $(xargs) flake8
 
 check: clean
