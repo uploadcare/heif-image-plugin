@@ -24,24 +24,13 @@ docker_build:
 docker_shell: docker_build
 	docker run --platform=linux/amd64 --rm -it -v .:/src heif-image-plugin:latest
 
-.PHONY: install-pyheif-latest-pillow-latest
-install-pyheif-latest-pillow-latest:
-	pip install .[test]
-
-.PHONY: install-pyheif-latest-pillow-prod
-install-pyheif-latest-pillow-prod:
-	pip install .[test] \
-		./pip-stubs/pillow \
-		git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-png-truncated#egg=pillow-simd
-
-
-.PHONY: install-pyheif-prod-pillow-latest
-install-pyheif-prod-pillow-latest:
+.PHONY: install-pillow-latest
+install-pillow-latest:
 	pip install .[test] \
 		git+https://github.com/uploadcare/pyheif.git@v0.8.0-transforms#egg=pyheif
 
-.PHONY: install-pyheif-prod-pillow-prod
-install-pyheif-prod-pillow-prod:
+.PHONY: install-pillow-prod
+install-pillow-prod:
 	pip install .[test] \
 		./pip-stubs/pillow \
 		git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-png-truncated#egg=pillow-simd \

@@ -2,14 +2,14 @@ on: [push]
 
 jobs:
   check:
-    name: py${{ matrix.python }} pillow-${{ matrix.pillow }} pyheif-${{ matrix.pyheif }}
+    name: py${{ matrix.python }} pillow-${{ matrix.pillow }} libheif-${{ matrix.libheif }}
     runs-on: ubuntu-20.04
     timeout-minutes: 3
     strategy:
       matrix:
         python: ['3.8', '3.11']
         pillow: [prod, latest]
-        pyheif: [prod, latest]
+        libheif: ['1.16.2-6ee6762-3f6b709', '1.18.2-bf35e9e-47f4fc0']
 
     steps:
     - uses: actions/checkout@v2
@@ -20,17 +20,18 @@ jobs:
     - name: Install system dependencies
       run: |
         BUCKET=https://uploadcare-packages.s3.amazonaws.com
-        curl -fLO $BUCKET/libheif/libheif-uc_1.18.2-bf35e9e-47f4fc0_$(dpkg --print-architecture).deb
+        curl -fLO $BUCKET/libheif/libheif-uc_${{ matrix.libheif }}_$(dpkg --print-architecture).deb
         sudo dpkg -i *.deb && rm *.deb
         sudo apt install --no-install-recommends -y libjpeg-dev
     - name: Update pip
       run: pip install pip==23.2.1
     - name: Install dependencies
-      run: make install-pyheif-${{ matrix.pyheif }}-pillow-${{ matrix.pillow }}
+      run: make install-pillow-${{ matrix.pillow }}
     - name: Check
       run: make check
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: true
         verbose: true
+        token: ${{ secrets.CODECOV_TOKEN }}
