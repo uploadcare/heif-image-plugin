@@ -1,4 +1,4 @@
-.PHONY: clean lint commit check
+.PHONY: clean lint commit check docker_build docker_shell
 
 xargs=$(if $(shell xargs -r </dev/null 2>/dev/null && echo 1), xargs -r, xargs)
 
@@ -8,36 +8,30 @@ clean:
 
 lint: clean
 	isort --diff HeifImagePlugin.py ./tests
-	pycodestyle HeifImagePlugin.py ./tests
 	flake8 HeifImagePlugin.py ./tests
 
 GIT_DIFF=git diff --name-only --cached --diff-filter=dt
 commit:
 	${GIT_DIFF} -- '*.py' | $(xargs) isort --diff
-	${GIT_DIFF} -- '*.py' | $(xargs) pycodestyle
 	${GIT_DIFF} -- '*.py' | $(xargs) flake8
 
 check: clean
 	pytest --cov=. --cov-report=xml tests
 
+docker_build:
+	docker build --platform=linux/amd64 -t heif-image-plugin:latest .
 
-.PHONY: install-pyheif-latest-pillow-latest
-install-pyheif-latest-pillow-latest:
-	pip install --use-deprecated=legacy-resolver .[test]
+docker_shell: docker_build
+	docker run --platform=linux/amd64 --rm -it -v .:/src heif-image-plugin:latest
 
-.PHONY: install-pyheif-latest-pillow-prod
-install-pyheif-latest-pillow-prod:
-	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-tiff-double-free#egg=pillow
+.PHONY: install-pillow-latest
+install-pillow-latest:
+	pip install .[test] \
+		git+https://github.com/uploadcare/pyheif.git@v0.8.0-transforms#egg=pyheif
 
-
-.PHONY: install-pyheif-prod-pillow-latest
-install-pyheif-prod-pillow-latest:
-	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pyheif.git@read-transformations#egg=pyheif
-
-.PHONY: install-pyheif-prod-pillow-prod
-install-pyheif-prod-pillow-prod:
-	pip install --use-deprecated=legacy-resolver .[test] \
-		-e git+https://github.com/uploadcare/pillow-simd.git@simd/6.0-tiff-double-free#egg=pillow \
-		-e git+https://github.com/uploadcare/pyheif.git@read-transformations#egg=pyheif
+.PHONY: install-pillow-prod
+install-pillow-prod:
+	pip install .[test] \
+		./pip-stubs/pillow \
+		git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-png-truncated#egg=pillow-simd \
+		git+https://github.com/uploadcare/pyheif.git@v0.8.0-transforms#egg=pyheif

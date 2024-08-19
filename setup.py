@@ -31,9 +31,9 @@ setup(
     ],
     extras_require={
         'test': [
-            'pillow>=6.0.0',
-            'pytest>=4.6.5',
-            'pytest-cov>=2.8.1',
+            'pillow>=9.0.0',
+            'pytest>=8.3.2',
+            'pytest-cov>=5.0.0',
         ]
     },
     classifiers=[
