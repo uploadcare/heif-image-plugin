@@ -42,6 +42,11 @@ This is not a big library but if you want to contribute is very easy!
 
 ## Changelog
 
+### 0.6.2
+
+* Fix for buggy LA mode in libheif 1.17.0 - 1.18.2
+* Fix Unsupported color conversion for some images
+
 ### 0.6.1
 
 * Added compatibility with Pillow 10.1+
