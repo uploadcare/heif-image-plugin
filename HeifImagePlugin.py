@@ -166,6 +166,9 @@ def check_heif_magic(data):
     return pyheif.check(data) != pyheif.heif_filetype_no
 
 
+is_buggy_la_mode = '1.17.0' <= pyheif.libheif_version() <= '1.18.2'
+
+
 def _save(im, fp, filename):
     # Save it before subsequent im.save() call
     info = im.encoderinfo
@@ -174,10 +177,14 @@ def _save(im, fp, filename):
         # disbled due to errors in libheif encoder
         raise IOError("cannot write mode P as HEIF")
 
+    if im.mode == '1':
+        # to circumvent `heif-enc` bug
+        im = im.convert('L')
+
+    if im.mode == 'LA' and is_buggy_la_mode:
+        im = im.convert('RGBA')
+
     with tempfile.NamedTemporaryFile(suffix='.png') as tmpfile:
-        if im.mode == '1':
-            # to circumvent `heif-enc` bug
-            im = im.convert('L')
         im.save(
             tmpfile, format='PNG', optimize=False, compress_level=0,
             icc_profile=info.get('icc_profile', im.info.get('icc_profile')),
