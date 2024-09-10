@@ -11,12 +11,6 @@ from PIL import Image, ImageFile
 from pyheif.error import HeifError
 
 
-try:
-    from pyheif.transformations import Transformations
-except ImportError:
-    Transformations = None
-
-
 @dataclass
 class LibheifError:
     code: int
@@ -159,7 +153,7 @@ class HeifImageFile(ImageFile.ImageFile):
 
     def _open(self):
         self.tile = []
-        self.heif_file = self._open_heif_file(Transformations is None)
+        self.heif_file = self._open_heif_file(False)
 
     def load(self):
         heif_file, self.heif_file = self.heif_file, None
@@ -183,8 +177,7 @@ class HeifImageFile(ImageFile.ImageFile):
             self.load_prepare()
 
             if heif_file.data:
-                if Transformations is not None:
-                    heif_file = _crop_heif_file(heif_file)
+                heif_file = _crop_heif_file(heif_file)
                 self.frombytes(heif_file.data, "raw", (self.mode, heif_file.stride))
 
             heif_file.data = None

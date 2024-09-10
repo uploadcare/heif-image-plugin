@@ -4,7 +4,7 @@ import os.path
 from setuptools import setup
 
 
-__version__ = '0.6.2'
+__version__ = '0.7.0'
 
 github_url = 'https://github.com/uploadcare'
 package_name = 'heif-image-plugin'
@@ -26,7 +26,7 @@ setup(
     download_url='%s/%s/archive/v%s.tar.gz' % (github_url, package_name, __version__),
     keywords=['heif', 'heic', 'Pillow', 'plugin', 'pyhief'],
     install_requires=[
-        "pyheif>=0.7.1",
+        "pyheif>=0.8.0",
         "piexif>=1.1.3",
     ],
     extras_require={
