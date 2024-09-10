@@ -17,16 +17,24 @@ You can install **heif-image-plugin** from *PyPI*:
 
 `pip install heif-image-plugin`
 
+### Install libheif binaries for saving capabilities
+
+Ubuntu:
+
+`apt install libheif-examples libheif-plugin-x265 libheif-plugin-aomenc`
+
 ## How to use
 
 Just import once before opening an image.
 
 ```python
-from PIL import Image
+from PIL import Image, ImageOps
 import HeifImagePlugin
 
 image = Image.open('test.heic')
-image.load()
+ImageOps.exif_transpose(image, in_place=True)
+# requires `heif-enc` binary with installed codecs or plugins
+image.save('test.avif')
 ```
 
 ## How to contribute
