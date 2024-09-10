@@ -1,22 +1,10 @@
 from unittest import mock
 
-import pyheif
-import pytest
 from PIL import Image
 from pyheif import open as pyheif_open
-
-from HeifImagePlugin import Transformations
+from pyheif.transformations import Transformations
 
 from . import avg_diff, respath
-
-
-skip_no_transformations = pytest.mark.skipif(
-    Transformations is None,
-    reason="pyheif doesn't support transformations")
-
-skip_libheif_not_16 = pytest.mark.skipif(
-    pyheif.libheif_version() < '1.16.0',
-    reason="libheif < 1.16.0 can't decode odd sizes")
 
 
 def open_with_custom_meta(path, *, exif_data=None, exif=None, crop=None, orientation=0):
@@ -32,11 +20,10 @@ def open_with_custom_meta(path, *, exif_data=None, exif=None, crop=None, orienta
             heif.metadata = [{'type': 'Exif', 'data': exif_data}]
         else:
             heif.metadata = None
-        if Transformations is not None:
-            heif.transformations = Transformations(*heif.size)
-            heif.transformations.orientation_tag = orientation
-            if crop:
-                heif.transformations.crop = crop
+        heif.transformations = Transformations(*heif.size)
+        heif.transformations.orientation_tag = orientation
+        if crop:
+            heif.transformations.crop = crop
         return heif
 
     with mock.patch('pyheif.open') as open_mock:
@@ -52,14 +39,12 @@ def test_no_orientation_and_no_exif():
     assert 'exif' not in image.info
 
 
-@skip_no_transformations
 def test_empty_exif():
     image = open_with_custom_meta(respath('test2.heic'), exif_data=b'', orientation=1)
     assert 'exif' in image.info
     assert image.getexif()[274] == 1
 
 
-@skip_no_transformations
 def test_broken_exif():
     broken = b'Exif\x00\x00II*\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00'
     image = open_with_custom_meta(respath('test2.heic'),
@@ -68,7 +53,6 @@ def test_broken_exif():
     assert image.getexif()[274] == 1
 
 
-@skip_no_transformations
 def test_orientation_and_no_exif():
     image = open_with_custom_meta(respath('test2.heic'), orientation=7)
 
@@ -84,7 +68,6 @@ def test_no_orientation_and_exif_with_rotation():
     assert image.getexif()[274] == 7
 
 
-@skip_no_transformations
 def test_orientation_and_exif_with_rotation():
     # Orientation tag from file should suppress Exif value
     image = open_with_custom_meta(
@@ -94,7 +77,6 @@ def test_orientation_and_exif_with_rotation():
     assert image.getexif()[274] == 1
 
 
-@skip_no_transformations
 def test_orientation_and_exif_without_rotation():
     image = open_with_custom_meta(
         respath('test2.heic'), orientation=1, exif={270: "Sample image"})
@@ -103,7 +85,6 @@ def test_orientation_and_exif_without_rotation():
     assert image.getexif()[274] == 1
 
 
-@skip_no_transformations
 def test_crop_on_load():
     ref_image = Image.open(respath('test2.heic'))
     assert ref_image.size == (1280, 720)
@@ -117,7 +98,6 @@ def test_crop_on_load():
     assert image.copy() == ref_image.crop((99, 33, 611, 289))
 
 
-@skip_libheif_not_16
 def test_fallback_to_transforms():
     # Image with 695x472 color and 696x472 alpha with crop
     image = Image.open(respath('unreadable-wo-transf.heic'))

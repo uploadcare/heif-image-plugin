@@ -50,9 +50,9 @@ This is not a big library but if you want to contribute is very easy!
 
 ## Changelog
 
-### 0.6.3
+### 0.7.0
 
-* Depends on pyheif>=0.8.0
+* Depends on pyheif>=0.8.0, drop older versions support
 
 ### 0.6.2
 
