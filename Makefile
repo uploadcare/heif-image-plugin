@@ -27,11 +27,11 @@ docker_shell: docker_build
 .PHONY: install-pillow-latest
 install-pillow-latest:
 	pip install .[test] \
-		git+https://github.com/uploadcare/pyheif.git@v0.8.0-transforms#egg=pyheif
+		git+https://github.com/carsales/pyheif.git@release-0.8.0#egg=pyheif
 
 .PHONY: install-pillow-prod
 install-pillow-prod:
 	pip install .[test] \
 		./pip-stubs/pillow \
 		git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-png-truncated#egg=pillow-simd \
-		git+https://github.com/uploadcare/pyheif.git@v0.8.0-transforms#egg=pyheif
+		git+https://github.com/carsales/pyheif.git@release-0.8.0#egg=pyheif

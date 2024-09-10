@@ -42,6 +42,10 @@ This is not a big library but if you want to contribute is very easy!
 
 ## Changelog
 
+### 0.6.3
+
+* Depends on pyheif>=0.8.0
+
 ### 0.6.2
 
 * Fix for buggy LA mode in libheif 1.17.0 - 1.18.2
