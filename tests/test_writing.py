@@ -1,5 +1,4 @@
 import os
-import subprocess
 import tempfile
 from io import BytesIO
 from unittest import mock
@@ -23,6 +22,22 @@ def test_binary_not_found(jungle_ref_image):
     with BytesIO() as fp:
         with pytest.raises(FileNotFoundError, match=r'HeifImagePlugin\.HEIF_ENC_BIN'):
             jungle_ref_image.save(fp, 'HEIF', avif=True)
+
+
+def test_encoder_error():
+    encoder = mock.MagicMock()
+    encoder.__enter__.return_value = encoder
+    encoder.stdout.read.return_value = b''
+    encoder.wait.return_value = 1
+
+    def fail(*args, **kwargs):
+        kwargs['stderr'].write(b'encoder failure details\n')
+        return encoder
+
+    with mock.patch('HeifImagePlugin.subprocess.Popen', side_effect=fail):
+        with BytesIO() as fp:
+            with pytest.raises(OSError, match='encoder failure details'):
+                Image.new('RGB', (1, 1)).save(fp, 'HEIF', avif=True)
 
 
 def test_save_to_filename(jungle_ref_image):
@@ -76,7 +91,7 @@ def test_quality(jungle_ref_image):
 
 def test_downsampling(jungle_ref_image):
     with BytesIO() as fp:
-        with pytest.raises(ValueError, match='Unknown'):
+        with pytest.raises(OSError, match='chroma'):
             jungle_ref_image.save(fp, 'HEIF', avif=True, downsampling=2)
 
     def get_diff_for_downsampling(downsampling):
@@ -90,12 +105,15 @@ def test_downsampling(jungle_ref_image):
     average_diff = get_diff_for_downsampling('average')
     sharp_diff = get_diff_for_downsampling('sharp-yuv')
 
-    assert nn_diff == default_diff, "nn should be default"
-    assert average_diff != default_diff
-    assert sharp_diff not in (default_diff, average_diff)
+    assert default_diff == average_diff, "average should be default"
+    assert default_diff not in (nn_diff, sharp_diff)
+    assert sharp_diff not in (nn_diff, average_diff)
 
 
 def test_subsampling(jungle_ref_image):
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, subsampling=None)
+
     with BytesIO() as fp:
         jungle_ref_image.save(fp, 'HEIF', avif=True, quality=90, subsampling=2)
         with pytest.raises(AssertionError, match='diff'):
@@ -123,12 +141,20 @@ def test_speed(jungle_ref_image):
         compare_with_original(fp, jungle_ref_image)
         speed_5_len = fp.tell()
 
+    params = {'speed': 5}
+    with BytesIO() as fp:
+        jungle_ref_image.save(fp, 'HEIF', avif=True, encoder_params=params)
+        compare_with_original(fp, jungle_ref_image)
+        params_speed_5_len = fp.tell()
+
     assert speed_5_len != speed_9_len
+    assert speed_5_len == params_speed_5_len
+    assert params == {'speed': 5}
 
 
 def test_concurrency(jungle_ref_image):
     with BytesIO() as fp:
-        with pytest.raises(subprocess.CalledProcessError):
+        with pytest.raises(OSError):
             jungle_ref_image.save(fp, 'HEIF', avif=True, concurrency='please')
 
     with BytesIO() as fp:
@@ -145,7 +171,7 @@ def test_good_modes(mode, dices_ref_image):
         compare_with_original(fp, ref.convert('RGBA' if 'A' in mode else 'RGB'))
 
 
-def test_deny_palette_mode(dices_ref_image):
+def test_reject_palette_mode(dices_ref_image):
     ref = dices_ref_image.convert('P', palette=Image.ADAPTIVE)
     with BytesIO() as fp:
         with pytest.raises(OSError):

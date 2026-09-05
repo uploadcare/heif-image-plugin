@@ -80,8 +80,8 @@ def _rotate_heif_file(heif):
     Heif files already contain transformation chunks imir and irot which are
     dominate over Orientation tag in EXIF.
 
-    This is not aligned with other formats behaviour and we MUST fix EXIF after
-    loading to prevent unexpected rotation after resaving in other formats.
+    This is not aligned with other formats behavior and we MUST fix EXIF after
+    loading to prevent unexpected rotation after re-saving in other formats.
 
     And we come up to there is no reasons to force rotation of HEIF images
     after loading since we need update EXIF anyway.
@@ -240,39 +240,47 @@ def _save(im, fp, filename):
             cmd.append('-A')
 
         if info.get('encoder'):
-            cmd.extend(['-e', info['encoder']])
+            cmd.extend(['-e', str(info['encoder'])])
 
         if info.get('quality') is not None:
             cmd.extend(['-q', str(info['quality'])])
 
-        if info.get('downsampling') is not None:
-            if info['downsampling'] not in ('nn', 'average', 'sharp-yuv'):
-                raise ValueError(f"Unknown downsampling: {info['downsampling']}")
-            cmd.extend(['-C', info['downsampling']])
+        cmd.extend(['-C', str(info.get('downsampling') or 'average')])
 
+        # Chroma is common parameter for all codecs
         subsampling = info.get('subsampling')
-        if subsampling is not None:
-            if subsampling == 0:
-                subsampling = '444'
-            elif subsampling == 1:
-                subsampling = '422'
-            elif subsampling == 2:
-                subsampling = '420'
-            cmd.extend(['-p', 'chroma=' + subsampling])
+        if subsampling is None:
+            subsampling = '420'
+        if subsampling == 0:
+            subsampling = '444'
+        elif subsampling == 1:
+            subsampling = '422'
+        elif subsampling == 2:
+            subsampling = '420'
+        cmd.extend(['-p', f'chroma={subsampling}'])
 
-        if info.get('speed') is not None:
-            cmd.extend(['-p', 'speed=' + str(info['speed'])])
+        if avif and info.get('concurrency') is not None:
+            cmd.extend(['-p', f"threads={info['concurrency']}"])
 
-        if info.get('concurrency') is not None:
-            cmd.extend(['-p', 'threads=' + str(info['concurrency'])])
+        params = dict(info.get('encoder_params') or {})
+        if (speed := info.get('speed')) is not None:
+            params.setdefault('speed', speed)
+        for k, v in params.items():
+            cmd.extend(['-p', f'{k}={v}'])
 
         try:
-            # Warning: Do not open stdout and stderr at the same time
-            with subprocess.Popen(cmd, stdout=subprocess.PIPE) as enc:
-                for data in iter(lambda: enc.stdout.read(128 * 1024), b''):
-                    fp.write(data)
-                if enc.wait():
-                    raise subprocess.CalledProcessError(enc.returncode, cmd)
+            with tempfile.TemporaryFile() as stderr:
+                with subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=stderr
+                ) as enc:
+                    for data in iter(lambda: enc.stdout.read(128 * 1024), b''):
+                        fp.write(data)
+                    if enc.wait():
+                        stderr.seek(0)
+                        message = stderr.read().decode(errors='replace').strip()
+                        if not message:
+                            message = f'heif-enc exited with code {enc.returncode}'
+                        raise OSError(message)
         except FileNotFoundError:
             raise FileNotFoundError(
                 2, f"Can't find heif encoding binary. Install '{HEIF_ENC_BIN}' "
