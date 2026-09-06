@@ -35,10 +35,10 @@ Homepage = "https://github.com/uploadcare/heif-image-plugin"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.2",
-    "pytest-cov>=5.0.0",
-    "isort>=9.0.1",
-    "flake8>=7.3.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=7.0.0",
+    "isort>=6.0.0",
+    "flake8>=7.0.0",
 ]
 dev-pillow-latest = [
     { include-group = "dev" },

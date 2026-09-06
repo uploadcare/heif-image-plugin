@@ -11,22 +11,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - stack: system
-            pillow: latest
-          - stack: embedded
-            pillow: latest
-          - stack: ucare
-            libheif: '1.16.2-6ee6762-3f6b709'
-            pillow: latest
-          - stack: ucare
-            libheif: '1.18.2-bf35e9e-47f4fc0'
-            pillow: latest
-          - stack: ucare
-            libheif: '1.21.2-62f1b8c-1a671c7'
-            pillow: latest
-          - stack: ucare
-            libheif: '1.21.2-62f1b8c-1a671c7'
-            pillow: prod
+          - { stack: system, pillow: latest }
+          - { stack: embedded, pillow: latest }
+          - { stack: ucare, libheif: '1.16.2-6ee6762-3f6b709', pillow: latest }
+          - { stack: ucare, libheif: '1.18.2-bf35e9e-47f4fc0', pillow: latest }
+          - { stack: ucare, libheif: '1.21.2-62f1b8c-1a671c7', pillow: latest }
+          - { stack: ucare, libheif: '1.23.3-78c9746-150efd1', pillow: latest }
+          - { stack: ucare, libheif: '1.23.3-78c9746-150efd1', pillow: prod }
 
     steps:
       - uses: actions/checkout@v7
