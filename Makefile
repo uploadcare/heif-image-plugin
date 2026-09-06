@@ -1,37 +1,45 @@
-.PHONY: clean lint commit check docker_build docker_shell
+XARGS := $(if $(shell echo | xargs -r 2>/dev/null && echo 1), xargs -r, xargs)
+GIT_DIFF := git diff --name-only --cached --diff-filter=dt
 
-xargs=$(if $(shell xargs -r </dev/null 2>/dev/null && echo 1), xargs -r, xargs)
 
-clean:
-	find . -type f \( -name \*.pyc -o -name \*.pyo \) -delete
-	find . -type d -name __pycache__ -print0 | $(xargs) -0 rm -rf
+.PHONY: commit
+commit:
+	$(GIT_DIFF) -- '*.py' | $(XARGS) isort --check-only --diff
+	$(GIT_DIFF) -- '*.py' | $(XARGS) flake8
 
-lint: clean
+
+.PHONY: lint
+lint:
 	isort --diff HeifImagePlugin.py ./tests
 	flake8 HeifImagePlugin.py ./tests
 
-GIT_DIFF=git diff --name-only --cached --diff-filter=dt
-commit:
-	${GIT_DIFF} -- '*.py' | $(xargs) isort --diff
-	${GIT_DIFF} -- '*.py' | $(xargs) flake8
 
-check: clean
-	pytest --cov=. --cov-report=xml tests
+.PHONY: test
+test:
+	pytest --cov=.
 
-docker_build:
-	docker build --platform=linux/amd64 -t heif-image-plugin:latest .
 
+ARCH ?= amd64
+STACK ?= system
+PILLOW ?= latest
+LIBHEIF_UC_VERSION ?= 1.21.2-62f1b8c-1a671c7
+
+
+.PHONY: dockerignore
+dockerignore:
+	@git status -s --ignored | sed -n 's/^!! /\//p' > .dockerignore
+	@printf "%s\n" "/.git*" >> .dockerignore
+
+
+.PHONY: docker_build
+docker_build: dockerignore
+	docker build --platform=linux/${ARCH} \
+		--build-arg STACK=${STACK} \
+		--build-arg PILLOW=${PILLOW} \
+		--build-arg LIBHEIF_UC_VERSION=${LIBHEIF_UC_VERSION} \
+		-t heif-image-plugin:latest .
+
+
+.PHONY: docker_shell
 docker_shell: docker_build
-	docker run --platform=linux/amd64 --rm -it -v .:/src heif-image-plugin:latest
-
-no-binary ?= pyheif
-
-.PHONY: install-pillow-latest
-install-pillow-latest:
-	pip install --no-binary $(no-binary) .[test]
-
-.PHONY: install-pillow-prod
-install-pillow-prod:
-	pip install --no-binary $(no-binary) .[test] \
-		./pip-stubs/pillow \
-		git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-png-truncated#egg=pillow-simd
+	docker run --platform=linux/${ARCH} --rm -it -v .:/src heif-image-plugin:latest

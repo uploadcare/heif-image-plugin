@@ -4,3 +4,4 @@ __pycache__
 /.coverage
 *.egg-info
 /build
+/.dockerignore

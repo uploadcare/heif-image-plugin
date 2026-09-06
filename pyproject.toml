@@ -34,14 +34,20 @@ dependencies = [
 Homepage = "https://github.com/uploadcare/heif-image-plugin"
 
 [dependency-groups]
-test = [
-    "pillow>=9.0.0,<12",
+dev = [
     "pytest>=8.3.2",
     "pytest-cov>=5.0.0",
-]
-dev = [
     "isort>=9.0.1",
     "flake8>=7.3.0",
+]
+dev-pillow-latest = [
+    { include-group = "dev" },
+    "pillow>=9.5.0,<12",
+]
+dev-pillow-prod = [
+    { include-group = "dev" },
+    "pillow @ file:./pip-stubs/pillow",
+    "pillow-simd @ git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-lut-overflow",
 ]
 
 [tool.setuptools]
