@@ -1,0 +1,11 @@
+[project]
+name = "pillow"
+version = "9.5.0"
+description = "Empty stub: satisfies transitive pillow deps on x86_64 without installing PyPI pillow (PIL comes from pillow-simd)"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []

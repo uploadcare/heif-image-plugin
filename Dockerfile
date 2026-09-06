@@ -61,5 +61,11 @@ FROM libheif-${STACK} AS development
 
 ARG PILLOW=latest
 
+COPY pyproject.toml README.md ./
+COPY pip-stubs/pillow/ ./pip-stubs/pillow/
+RUN set -ex \
+    && touch HeifImagePlugin.py \
+    && pip install --only-binary=pyheif --group dev-pillow-${PILLOW} -e . \
+    && rm HeifImagePlugin.py
+
 COPY . .
-RUN pip install --only-binary=pyheif --group dev-pillow-${PILLOW} -e .
