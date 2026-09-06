@@ -5,8 +5,7 @@ from io import BytesIO
 from unittest import mock
 
 import pytest
-
-from HeifImagePlugin import Image
+from PIL import Image
 
 from . import avg_diff
 

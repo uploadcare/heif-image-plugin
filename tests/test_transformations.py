@@ -1,5 +1,7 @@
 from unittest import mock
 
+import pyheif
+import pytest
 from PIL import Image
 from pyheif import open as pyheif_open
 from pyheif.transformations import Transformations
@@ -98,6 +100,12 @@ def test_crop_on_load():
     assert image.copy() == ref_image.crop((99, 33, 611, 289))
 
 
+@pytest.mark.xfail(
+    '1.19.0' <= pyheif.libheif_version() < '1.22.0',
+    reason='libheif cannot decode this alpha/crop image',
+    strict=True,
+)
+@mock.patch('PIL.ImageFile.LOAD_TRUNCATED_IMAGES', True)
 def test_fallback_to_transforms():
     # Image with 695x472 color and 696x472 alpha with crop
     image = Image.open(respath('unreadable-wo-transf.heic'))

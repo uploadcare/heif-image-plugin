@@ -8,7 +8,23 @@ import piexif
 import pyheif
 from cffi import FFI
 from PIL import Image, ImageFile
+from pyheif import reader as pyheif_reader
 from pyheif.error import HeifError
+
+
+class _LibheifProxy:
+    def heif_decoding_options_alloc(self):
+        options = _native_libheif.heif_decoding_options_alloc()
+        if hasattr(options, 'strict_decoding'):
+            options.strict_decoding = int(not ImageFile.LOAD_TRUNCATED_IMAGES)
+        return options
+
+    def __getattr__(self, name):
+        return getattr(_native_libheif, name)
+
+
+_native_libheif = pyheif_reader.libheif
+pyheif_reader.libheif = _LibheifProxy()
 
 
 @dataclass
