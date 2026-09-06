@@ -4,24 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "heif-image-plugin"
-version = "0.7.0"
-description = "Simple HEIF/HEIC images plugin for Pillow base on pyhief library."
+version = "0.8.0"
+description = "A HEIF/HEIC and AVIF plugin for Pillow based on the pyheif library."
 readme = "README.md"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
     { name = "Alexander Karpinsky", email = "homm86@gmail.com" },
 ]
-keywords = ["heif", "heic", "Pillow", "plugin", "pyhief"]
+keywords = ["heif", "heic", "Pillow", "plugin", "pyheif"]
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Multimedia :: Graphics",
 ]
 dependencies = [
