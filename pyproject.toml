@@ -41,7 +41,7 @@ dev = [
 ]
 dev-pillow-latest = [
     { include-group = "dev" },
-    "pillow>=9.5.0,<12",
+    "pillow>=9.5.0",
 ]
 dev-pillow-prod = [
     { include-group = "dev" },
