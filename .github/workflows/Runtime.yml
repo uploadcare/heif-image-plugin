@@ -1,0 +1,60 @@
+name: Runtime
+
+on: [push]
+
+jobs:
+  test:
+    name: ${{ matrix.stack }} / Pillow ${{ matrix.pillow }}${{ matrix.libheif && format(' / libheif {0}', matrix.libheif) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - stack: system
+            pillow: latest
+          - stack: embedded
+            pillow: latest
+          - stack: ucare
+            libheif: '1.16.2-6ee6762-3f6b709'
+            pillow: latest
+          - stack: ucare
+            libheif: '1.18.2-bf35e9e-47f4fc0'
+            pillow: latest
+          - stack: ucare
+            libheif: '1.21.2-62f1b8c-1a671c7'
+            pillow: latest
+          - stack: ucare
+            libheif: '1.21.2-62f1b8c-1a671c7'
+            pillow: prod
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Create Docker ignore file
+        run: make dockerignore
+
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: heif-image-plugin:test
+          build-args: |
+            STACK=${{ matrix.stack }}
+            PILLOW=${{ matrix.pillow }}
+            LIBHEIF_UC_VERSION=${{ matrix.libheif }}
+          cache-from: type=gha,scope=${{ matrix.stack }}-${{ matrix.pillow }}-${{ matrix.libheif }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.stack }}-${{ matrix.pillow }}-${{ matrix.libheif }}
+
+      - name: Test
+        run: docker run --rm -v .:/src heif-image-plugin:test make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
