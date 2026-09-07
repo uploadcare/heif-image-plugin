@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
 
     steps:
       - uses: actions/checkout@v7
@@ -23,13 +23,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libheif-examples \
+            libheif-dev libheif-examples \
             libheif-plugin-libde265 libheif-plugin-x265 libheif-plugin-aomenc
 
       - name: Install dependencies
         run: |
           pip install --upgrade 'pip>=25.1'
-          pip install --only-binary=:all: --group dev-pillow-latest -e .
+          pip install --only-binary=pillow --group dev-pillow-latest -e .
 
       - name: Test
         run: make test

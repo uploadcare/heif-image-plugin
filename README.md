@@ -1,12 +1,13 @@
 # heif-image-plugin
 
-[![build](https://travis-ci.org/uploadcare/heif-image-plugin.svg?branch=master)](https://travis-ci.org/uploadcare/heif-image-plugin)
-[![coverage](https://img.shields.io/codecov/c/gh/uploadcare/heif-image-plugin)](https://codecov.io/gh/uploadcare/heif-image-plugin)
-[![Py Versions](https://img.shields.io/pypi/pyversions/heif-image-plugin)](https://pypi.python.org/pypi/heif-image-plugin/)
-[![license](https://img.shields.io/github/license/uploadcare/heif-image-plugin)](https://pypi.python.org/pypi/heif-image-plugin/)
+[![Runtime](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Runtime.yml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Runtime.yml)
+[![Python](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yml)
+[![coverage](https://img.shields.io/codecov/c/gh/uploadcare/heif-image-plugin)](https://app.codecov.io/gh/uploadcare/heif-image-plugin)
+[![Py Versions](https://img.shields.io/pypi/pyversions/heif-image-plugin)](https://pypi.org/project/heif-image-plugin/)
+[![license](https://img.shields.io/github/license/uploadcare/heif-image-plugin)](https://github.com/uploadcare/heif-image-plugin/blob/main/LICENSE)
 
-Simple HEIF/HEIC images plugin for [Pillow](https://pillow.readthedocs.io)
-base on [pyhief](https://github.com/carsales/pyheif#pyheif) library.
+A HEIF/HEIC and AVIF plugin for [Pillow](https://pillow.readthedocs.io/)
+based on the [pyheif](https://github.com/carsales/pyheif) library.
 
 Originally based on the [pyheif-pillow-opener](https://github.com/ciotto/pyheif-pillow-opener)
 code from Christian Bianciotto.
@@ -19,9 +20,17 @@ You can install **heif-image-plugin** from *PyPI*:
 
 ### Install libheif binaries for saving capabilities
 
-Ubuntu:
+Ubuntu 24.04:
 
-`apt install libheif-examples libheif-plugin-x265 libheif-plugin-aomenc`
+```bash
+apt-get install --no-install-recommends \
+    libheif-examples \
+    libheif-plugin-libde265 \
+    libheif-plugin-x265 \
+    libheif-plugin-aomenc
+```
+
+Minimal supported libheif version is 1.17.x.
 
 ## How to use
 
@@ -37,27 +46,50 @@ ImageOps.exif_transpose(image, in_place=True)
 image.save('test.avif')
 ```
 
+Encoder-specific parameters can be passed when saving:
+
+```python
+image.save(
+    'test.avif',
+    quality=90,
+    subsampling='420',
+    downsampling='average',
+    encoder='aom',
+    concurrency=4,
+    encoder_params={'speed': 6},
+)
+```
+
 ## How to contribute
 
-This is not a big library but if you want to contribute is very easy!
+Contributions are welcome:
 
- 1. clone the repository `git clone https://github.com/uploadcare/heif-image-plugin.git`
- 1. install all requirements `make init`
- 1. do your fixes or add new awesome features (with tests)
- 1. run the tests `make test`
- 1. commit in new branch and make a pull request
+1. Clone the repository: `git clone https://github.com/uploadcare/heif-image-plugin.git`.
+2. Build the development image: `make docker_build`.
+3. Start a development shell: `make docker_shell`.
+4. Make your changes and add tests.
+5. Run `make lint` and `make test` inside the container.
+6. Commit your changes on a new branch and open a pull request.
 
 
 ## Changelog
 
+### 0.8.0
+
+* Minimal supported Python version is 3.9
+* Minimal supported libheif version is 1.17.x
+* Added `encoder_params` parameter for passing custom encoder parameters when saving
+* Changed the default chroma downsampling algorithm from `nn` to `average`
+* Default chroma subsampling is now explicitly set to 4:2:0
+
 ### 0.7.0
 
-* Depends on pyheif>=0.8.0, drop older versions support
+* Depends on pyheif>=0.8.0; dropped support for older versions
 
 ### 0.6.2
 
 * Fix for buggy LA mode in libheif 1.17.0 - 1.18.2
-* Fix Unsupported color conversion for some images
+* Fixed unsupported color conversion for some images
 
 ### 0.6.1
 
@@ -77,7 +109,7 @@ This is not a big library but if you want to contribute is very easy!
 
 * Added HEIF saving support if `heif-enc` is installed (part of libheif)
 * Fixed `HeifImageFile.verify()` call
-* Extensions .heic, .avif, .heif, .hif are handled by the plugin
+* Extensions `.heic`, `.avif`, `.heif`, `.hif` are handled by the plugin
 
 ### 0.4.0
 
@@ -104,7 +136,7 @@ target in the `Makefile` to install it.
 * `pyheif.open` API is used for lazy images loading.
 * Fixed an error when the plugin tries to load any ISOBMFF files.
 * AVIF files should work before, but now this is official.
-* Patched versions of `pyheif` and `libheif` with exposed transformations is supported.
+* Patched versions of `pyheif` and `libheif` with exposed transformations are supported.
   In this case opened image isn't transformed on loading and orientation is stored
   in EXIF `Orientation` tag like for all other image formats.
   This is faster and consumes less memory.
@@ -114,4 +146,4 @@ target in the `Makefile` to install it.
 * No need to register, works after import.
 * Fill `info['icc_profile']` on loading.
 * Close and release file pointer after loading.
-* Deconding without custom HeifDecoder(ImageFile.PyDecoder).
+* Decoding without custom HeifDecoder(ImageFile.PyDecoder).
