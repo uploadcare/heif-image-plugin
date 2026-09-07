@@ -1,6 +1,8 @@
 import pytest
 from PIL import Image
 
+import HeifImagePlugin  # noqa: F401
+
 from . import respath
 
 

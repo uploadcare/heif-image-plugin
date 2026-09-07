@@ -1,0 +1,35 @@
+name: Python
+
+on: [push]
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install libheif binaries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libheif-examples \
+            libheif-plugin-libde265 libheif-plugin-x265 libheif-plugin-aomenc
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade 'pip>=25.1'
+          pip install --only-binary=:all: --group dev-pillow-latest -e .
+
+      - name: Test
+        run: make test
