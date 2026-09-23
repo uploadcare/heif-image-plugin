@@ -16,7 +16,7 @@ lint:
 
 .PHONY: test
 test:
-	pytest --cov=.
+	pytest --cov=HeifImagePlugin
 
 
 ARCH ?= amd64
