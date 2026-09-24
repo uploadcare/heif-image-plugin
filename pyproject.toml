@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "heif-image-plugin"
-version = "0.8.0"
+version = "0.8.1"
 description = "A HEIF/HEIC and AVIF plugin for Pillow based on the pyheif library."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -42,12 +42,13 @@ dev = [
 ]
 dev-pillow-latest = [
     { include-group = "dev" },
-    "pillow>=9.5.0",
+    "pillow>=10.0.1",
 ]
 dev-pillow-prod = [
     { include-group = "dev" },
     "pillow @ file:./pip-stubs/pillow",
-    "pillow-simd @ git+https://github.com/uploadcare/pillow-simd.git@simd/9.5-lut-overflow",
+    # branch: simd/12.3.x-prod
+    "pillow-simd @ git+https://github.com/uploadcare/pillow-simd.git@b4c33a96e58e1896c36fed40e759eed0ab5bab4d",
 ]
 
 [tool.setuptools]

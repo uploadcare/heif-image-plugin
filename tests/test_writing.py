@@ -1,10 +1,14 @@
 import os
+import re
+import subprocess
 import tempfile
 from io import BytesIO
 from unittest import mock
 
 import pytest
 from PIL import Image
+
+import HeifImagePlugin
 
 from . import avg_diff
 
@@ -74,6 +78,45 @@ def test_encoder(jungle_ref_image):
     with BytesIO() as fp:
         jungle_ref_image.save(fp, 'HEIF', avif=True, encoder='aom')
         compare_with_original(fp, jungle_ref_image)
+
+
+@pytest.fixture(scope='module')
+def svt_available():
+    try:
+        encoders = subprocess.run(
+            [HeifImagePlugin.HEIF_ENC_BIN, '--list-encoders'],
+            capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        pytest.skip('heif-enc is not installed')
+    if encoders.returncode or not re.search(r'^-\s+svt\s*=', encoders.stdout, re.M):
+        pytest.skip('SVT encoder is not available')
+
+
+@pytest.mark.parametrize('subsampling', [None, 2, '420'])
+def test_svt_subsampling(svt_available, jungle_ref_image, subsampling):
+    with BytesIO() as fp:
+        jungle_ref_image.save(
+            fp, 'HEIF', avif=True, encoder='svt', subsampling=subsampling)
+        image = Image.open(fp)
+        image.load()
+        assert image.format == 'HEIF'
+        assert image.size == jungle_ref_image.size
+
+
+@pytest.mark.parametrize('subsampling', [0, 1, '444', '422'])
+def test_svt_rejects_other_subsampling(svt_available, subsampling):
+    with BytesIO() as fp:
+        with pytest.raises(ValueError, match='subsampling=420'):
+            Image.new('RGB', (2, 2)).save(
+                fp, 'HEIF', avif=True, encoder='svt', subsampling=subsampling)
+
+
+def test_svt_rejects_chroma_encoder_param(svt_available):
+    with BytesIO() as fp:
+        with pytest.raises(ValueError, match='chroma'):
+            Image.new('RGB', (2, 2)).save(
+                fp, 'HEIF', avif=True, encoder='svt',
+                encoder_params={'chroma': '420'})
 
 
 def test_quality(jungle_ref_image):

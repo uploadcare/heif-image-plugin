@@ -44,11 +44,11 @@ RUN pip install --no-binary=pyheif pyheif==0.8.0
 # Recent libheif and binaries from Uploadcare, patched pyheif
 FROM base AS libheif-ucare
 
-ARG LIBHEIF_UC_VERSION=1.21.2-62f1b8c-1a671c7
+ARG LIBHEIF_UC=1.23.5-413e2a8-7521f33
 
 RUN set -ex \
     && BUCKET=https://uploadcare-packages.s3.amazonaws.com \
-    && curl -fLO $BUCKET/libheif/libheif-uc_${LIBHEIF_UC_VERSION}_$(dpkg --print-architecture).deb \
+    && curl -fLO $BUCKET/libheif/libheif-uc_${LIBHEIF_UC}_$(dpkg --print-architecture).deb \
     && apt-get update \
     && apt-get install --no-install-recommends -y ./*.deb \
     && rm *.deb

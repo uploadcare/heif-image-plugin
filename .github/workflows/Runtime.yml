@@ -16,7 +16,8 @@ jobs:
           - { stack: ucare, libheif: '1.18.2-bf35e9e-47f4fc0', pillow: latest }
           - { stack: ucare, libheif: '1.21.2-62f1b8c-1a671c7', pillow: latest }
           - { stack: ucare, libheif: '1.23.3-78c9746-150efd1', pillow: latest }
-          - { stack: ucare, libheif: '1.23.3-78c9746-150efd1', pillow: prod }
+          - { stack: ucare, libheif: '1.23.5-413e2a8-7521f33', pillow: latest }
+          - { stack: ucare, libheif: '1.23.5-413e2a8-7521f33', pillow: prod }
 
     steps:
       - uses: actions/checkout@v7
@@ -35,7 +36,7 @@ jobs:
           build-args: |
             STACK=${{ matrix.stack }}
             PILLOW=${{ matrix.pillow }}
-            LIBHEIF_UC_VERSION=${{ matrix.libheif }}
+            LIBHEIF_UC=${{ matrix.libheif }}
           cache-from: type=gha,scope=${{ matrix.stack }}-${{ matrix.pillow }}-${{ matrix.libheif }}
           cache-to: type=gha,mode=max,scope=${{ matrix.stack }}-${{ matrix.pillow }}-${{ matrix.libheif }}
 

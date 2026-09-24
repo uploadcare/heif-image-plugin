@@ -60,6 +60,13 @@ image.save(
 )
 ```
 
+To encode AVIF with SVT-AV1, use `encoder='svt'`. SVT supports only 4:2:0
+subsampling; omit `subsampling` or set it to `'420'`:
+
+```python
+image.save('test.avif', encoder='svt', subsampling='420')
+```
+
 ## How to contribute
 
 Contributions are welcome:

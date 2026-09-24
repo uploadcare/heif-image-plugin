@@ -247,7 +247,7 @@ def _save(im, fp, filename):
 
         cmd.extend(['-C', str(info.get('downsampling') or 'average')])
 
-        # Chroma is common parameter for all codecs
+        is_svt = info.get('encoder') == 'svt'
         subsampling = info.get('subsampling')
         if subsampling is None:
             subsampling = '420'
@@ -257,12 +257,18 @@ def _save(im, fp, filename):
             subsampling = '422'
         elif subsampling == 2:
             subsampling = '420'
-        cmd.extend(['-p', f'chroma={subsampling}'])
+        if is_svt:
+            if subsampling != '420':
+                raise ValueError('SVT encoder supports only subsampling=420')
+        else:
+            cmd.extend(['-p', f'chroma={subsampling}'])
 
         if avif and info.get('concurrency') is not None:
             cmd.extend(['-p', f"threads={info['concurrency']}"])
 
         params = dict(info.get('encoder_params') or {})
+        if is_svt and 'chroma' in params:
+            raise ValueError('SVT encoder does not support chroma parameter')
         if (speed := info.get('speed')) is not None:
             params.setdefault('speed', speed)
         for k, v in params.items():

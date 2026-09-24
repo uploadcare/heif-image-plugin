@@ -1,6 +1,6 @@
 [project]
 name = "pillow"
-version = "9.5.0"
+version = "12.3.0"
 description = "Empty stub: satisfies transitive pillow deps on x86_64 without installing PyPI pillow (PIL comes from pillow-simd)"
 
 [build-system]

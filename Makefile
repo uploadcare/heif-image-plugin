@@ -16,13 +16,13 @@ lint:
 
 .PHONY: test
 test:
-	pytest --cov=.
+	pytest --cov=HeifImagePlugin
 
 
 ARCH ?= amd64
 STACK ?= system
-PILLOW ?= latest
-LIBHEIF_UC_VERSION ?= 1.21.2-62f1b8c-1a671c7
+PILLOW ?=
+LIBHEIF_UC ?=
 
 
 .PHONY: dockerignore
@@ -35,8 +35,8 @@ dockerignore:
 docker_build: dockerignore
 	docker build --platform=linux/${ARCH} \
 		--build-arg STACK=${STACK} \
-		--build-arg PILLOW=${PILLOW} \
-		--build-arg LIBHEIF_UC_VERSION=${LIBHEIF_UC_VERSION} \
+		$(if $(PILLOW),--build-arg PILLOW=$(PILLOW)) \
+		$(if $(LIBHEIF_UC),--build-arg LIBHEIF_UC=$(LIBHEIF_UC)) \
 		-t heif-image-plugin:latest .
 
 
