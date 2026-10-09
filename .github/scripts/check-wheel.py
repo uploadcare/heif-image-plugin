@@ -25,8 +25,9 @@ with ZipFile(wheel) as archive, tempfile.TemporaryDirectory() as directory:
                   if name.endswith('/_libheif.abi3.so')]
     assert not any('libheif_binary/' in name or name.endswith('.dylib')
                    or 'libheif.so' in name for name in archive.namelist())
-    archive.extract(extension, directory)
-    path = str(Path(directory) / extension)
+    path = Path(directory) / '_libheif.abi3.so'
+    path.write_bytes(archive.read(extension))
+    path = str(path)
     if platform.endswith('universal2'):
         subprocess.run(['lipo', path, '-verify_arch', 'arm64', 'x86_64'],
                        check=True)
