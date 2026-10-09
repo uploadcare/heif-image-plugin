@@ -1,7 +1,8 @@
 # heif-image-plugin
 
-[![Runtime](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Runtime.yml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Runtime.yml)
-[![Python](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yml)
+[![Linux](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Linux.yaml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Linux.yaml)
+[![macOS](https://github.com/uploadcare/heif-image-plugin/actions/workflows/MacOS.yaml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/MacOS.yaml)
+[![Python](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yaml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yaml)
 [![coverage](https://img.shields.io/codecov/c/gh/uploadcare/heif-image-plugin)](https://app.codecov.io/gh/uploadcare/heif-image-plugin)
 [![Py Versions](https://img.shields.io/pypi/pyversions/heif-image-plugin)](https://pypi.org/project/heif-image-plugin/)
 [![license](https://img.shields.io/github/license/uploadcare/heif-image-plugin)](https://github.com/uploadcare/heif-image-plugin/blob/main/LICENSE)

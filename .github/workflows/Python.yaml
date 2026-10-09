@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }} / ${{ matrix.runner }}
+    name: Test source / Python ${{ matrix.python-version }} / ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     strategy:
