@@ -10,8 +10,8 @@ commit:
 
 .PHONY: lint
 lint:
-	isort --check-only --diff HeifImagePlugin.py _heif_image_plugin bindings setup.py ./tests
-	flake8 HeifImagePlugin.py _heif_image_plugin bindings setup.py ./tests
+	isort --check-only --diff HeifImagePlugin.py _heif_image_plugin bindings setup.py ./tests .github/scripts
+	flake8 HeifImagePlugin.py _heif_image_plugin bindings setup.py ./tests .github/scripts
 
 
 .PHONY: test

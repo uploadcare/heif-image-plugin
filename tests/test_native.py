@@ -2,6 +2,7 @@ import builtins
 import ctypes
 import gc
 import sys
+import sysconfig
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,6 +17,12 @@ from _heif_image_plugin.errors import HeifError
 from _heif_image_plugin.transformations import crop_heif_file
 
 from . import respath
+
+
+@pytest.mark.skipif(not sysconfig.get_config_var('Py_GIL_DISABLED'),
+                    reason='Requires free-threaded Python')
+def test_free_threaded_python_runs_without_gil():
+    assert not sys._is_gil_enabled(), 'GIL is enabled'
 
 
 @pytest.fixture
@@ -136,18 +143,9 @@ def test_loaded_extension_version_is_checked(
     ctypes.CDLL.assert_not_called()
 
 
-@pytest.mark.parametrize('platform, library_exists', [
-    ('darwin', False), ('linux', False), ('linux', True),
-])
-def test_unresolved_import_adds_hint_and_preserves_cause_without_fallback(
-        monkeypatch, system, import_native, tmp_path, platform, library_exists):
+def test_unresolved_import_adds_hint_and_preserves_cause(
+        monkeypatch, system, import_native):
     monkeypatch.setitem(sys.modules, 'libheif_binary', None)
-    monkeypatch.setattr(sys, 'platform', platform)
-    monkeypatch.setenv('HOMEBREW_PREFIX', str(tmp_path))
-    if library_exists:
-        library = tmp_path / 'lib' / 'libheif.dylib'
-        library.parent.mkdir()
-        library.touch()
     execute, extension_import, _ = import_native
     error = ImportError('missing dependency')
     extension_import.side_effect = error
@@ -155,40 +153,6 @@ def test_unresolved_import_adds_hint_and_preserves_cause_without_fallback(
         execute()
     assert caught.value.__cause__ is error
     ctypes.CDLL.assert_not_called()
-
-
-@pytest.mark.parametrize('failure', [None, 'load', 'import'])
-def test_homebrew_fallback_loads_locally_after_failed_import(
-        monkeypatch, system, import_native, tmp_path, failure):
-    monkeypatch.setitem(sys.modules, 'libheif_binary', None)
-    monkeypatch.setattr(sys, 'platform', 'darwin')
-    monkeypatch.setenv('HOMEBREW_PREFIX', str(tmp_path))
-    library = tmp_path / 'lib' / 'libheif.dylib'
-    library.parent.mkdir()
-    library.touch()
-    execute, extension_import, extension = import_native
-    error = OSError('broken library') if failure == 'load' else ImportError(
-        'unresolved dependency')
-    extension_import.side_effect = [ImportError('first import'),
-                                    error if failure == 'import' else extension]
-
-    def load(*args, **kwargs):
-        assert extension_import.call_count == 1
-        if failure == 'load':
-            raise error
-        return system
-
-    ctypes.CDLL.side_effect = load
-    if failure:
-        with pytest.raises(ImportError, match='libheif-binary>=1.17') as caught:
-            execute()
-        assert caught.value.__cause__ is error
-    else:
-        namespace = execute()
-        assert namespace['_library_handle'] is system
-        assert namespace['libheif_version'] == (1, 23, 0)
-        assert extension_import.call_count == 2
-    ctypes.CDLL.assert_called_once_with(str(library), mode=ctypes.RTLD_LOCAL)
 
 
 def test_encoder_override_reaches_subprocess():

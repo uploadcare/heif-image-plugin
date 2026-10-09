@@ -4,13 +4,17 @@ on: [push]
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-24.04
+    name: Python ${{ matrix.python-version }} / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14', 'pypy3.11-v7.3.x', '3.14t']
+        runner: [ubuntu-24.04]
+        include:
+          - { python-version: 'pypy3.11-v7.3.x', runner: ubuntu-24.04-arm }
+          - { python-version: '3.14t', runner: ubuntu-24.04-arm }
 
     steps:
       - uses: actions/checkout@v7
@@ -19,10 +23,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Install from source
         run: |
           pip install --upgrade 'pip>=25.1'
-          pip install --only-binary=pillow --group dev-pillow-latest -e '.[libheif]'
+          pip install --only-binary=pillow --group dev-pillow-latest '.[libheif]'
+          rm -rf HeifImagePlugin.py _heif_image_plugin
 
       - name: Test
         run: make test

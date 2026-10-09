@@ -3,28 +3,64 @@ name: Runtime
 on: [push]
 
 jobs:
-  build-extension:
-    name: Extension / ${{ matrix.platform.os }} / ${{ matrix.platform.arch }}
+  build-linux:
+    name: Wheel / ${{ matrix.base }} / ${{ matrix.platform.arch }}
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 3
     strategy:
       fail-fast: false
       matrix:
+        base: [manylinux, musllinux]
         platform:
-          - { os: linux, arch: amd64, runner: ubuntu-24.04 }
-          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm }
-          - { os: macos, arch: arm64, runner: macos-15 }
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build and check wheel
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: .
+          file: .github/wheels.Dockerfile
+          target: wheel
+          build-args: BASE=${{ matrix.base }}
+          outputs: type=local,dest=wheels
+          cache-from: type=gha,scope=wheels-${{ matrix.base }}-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=wheels-${{ matrix.base }}-${{ matrix.platform.arch }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          path: wheels/*.whl
+          if-no-files-found: error
+
+  build-macos:
+    name: Wheel / macOS / universal2
+    runs-on: macos-15
+    timeout-minutes: 3
+    env:
+      ARCHFLAGS: '-arch arm64 -arch x86_64'
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+          architecture: arm64
 
       - name: Build wheel
         run: |
           pip install --upgrade pip
-          pip wheel --no-deps --wheel-dir wheels .
+          pip wheel --no-deps --wheel-dir wheels \
+            --config-settings=--build-option=--plat-name=macosx_11_0_universal2 .
+          pip install packaging
+          python .github/scripts/check-wheel.py wheels/*.whl macosx_11_0_universal2
 
       - uses: actions/upload-artifact@v7
         with:
@@ -34,7 +70,7 @@ jobs:
 
   linux:
     name: Linux / ${{ matrix.platform.arch }} / ${{ matrix.runtime.stack }} ${{ matrix.runtime.libheif }} / Pillow ${{ matrix.runtime.pillow || 'latest' }}
-    needs: build-extension
+    needs: build-linux
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 5
     strategy:
@@ -55,49 +91,80 @@ jobs:
           - { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc' }
           - { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc', pillow: prod }
         exclude:
-          - platform: { arch: arm64, wheel_arch: aarch64, runner: ubuntu-24.04-arm }
-            runtime: { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc', pillow: prod }
+          - platform: { arch: arm64 }
+            runtime: { pillow: prod }
 
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Create Docker ignore file
-        run: make dockerignore
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: '*-linux_${{ matrix.platform.wheel_arch }}.whl'
+          pattern: '*-manylinux_2_28_${{ matrix.platform.wheel_arch }}.whl'
           path: wheels
           merge-multiple: true
           skip-decompress: true
 
-      - name: Build test image
-        uses: docker/build-push-action@v7
-        env:
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
-        with:
-          context: .
-          target: libheif-${{ matrix.runtime.stack }}
-          tags: heif-image-plugin:test
-          build-args: |
-            LIBHEIF_UC=${{ matrix.runtime.libheif }}
-            LIBHEIF_BINARY=${{ matrix.runtime.libheif }}
-          load: true
-          cache-from: type=gha,scope=runtime-linux-${{ matrix.platform.arch }}-${{ matrix.runtime.stack }}-${{ matrix.runtime.libheif }}
-          cache-to: type=gha,mode=max,scope=runtime-linux-${{ matrix.platform.arch }}-${{ matrix.runtime.stack }}-${{ matrix.runtime.libheif }}
+      - name: Install system libheif
+        if: matrix.runtime.stack == 'system'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libheif1 libheif-examples \
+            libheif-plugin-libde265 libheif-plugin-x265 libheif-plugin-aomenc
 
-      - name: Test
+      - name: Install bundled libheif
+        if: matrix.runtime.stack == 'bundled'
+        env:
+          LIBHEIF_BINARY: ${{ matrix.runtime.libheif }}
+        run: |
+          pip install "libheif-binary==${LIBHEIF_BINARY}"
+
+      - name: Install Uploadcare libheif
+        if: matrix.runtime.stack == 'ucare'
+        env:
+          LIBHEIF_UC: ${{ matrix.runtime.libheif }}
+        run: |
+          BUCKET=https://uploadcare-packages.s3.amazonaws.com
+          curl -fLO "$BUCKET/libheif/libheif-uc_${LIBHEIF_UC}_$(dpkg --print-architecture).deb"
+          sudo apt-get update
+          sudo apt-get remove -y libheif1
+          sudo apt-get install --no-install-recommends -y ./*.deb
+          rm *.deb
+
+      - name: Install Pillow-SIMD build dependencies
+        if: matrix.runtime.pillow == 'prod'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential libffi-dev libjpeg-dev libpng-dev libtiff-dev liblcms2-dev
+
+      - name: Install plugin and test dependencies
         env:
           PILLOW: ${{ matrix.runtime.pillow || 'latest' }}
         run: |
-          docker run --rm -v ".:/src" -e HEIF_IMAGE_PLUGIN_EXTEND_PATH=1 \
-            heif-image-plugin:test sh -ec "
-              pip install --group 'dev-pillow-${PILLOW}' wheels/*.whl
-              make test
-            "
+          pip install --upgrade 'pip>=25.1'
+          if [ "$PILLOW" = latest ]; then
+            pip install --only-binary=pillow --group dev-pillow-latest wheels/*.whl
+          else
+            pip install --group dev-pillow-prod wheels/*.whl
+          fi
+          rm -rf HeifImagePlugin.py _heif_image_plugin
+
+      - name: Check bundled libheif version
+        if: matrix.runtime.stack == 'bundled'
+        run: |
+          python - <<'PY'
+          import libheif_binary
+          from HeifImagePlugin import libheif_version
+          assert libheif_version == libheif_binary.get_version(), (libheif_version, expected)
+          PY
+
+      - name: Test
+        run: make test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
@@ -107,9 +174,43 @@ jobs:
           verbose: true
 
 
+  musl:
+    name: musl / ${{ matrix.platform.arch }} / bundled
+    needs: build-linux
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { arch: amd64, wheel_arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: arm64, wheel_arch: aarch64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: '*-musllinux_1_2_${{ matrix.platform.wheel_arch }}.whl'
+          path: wheels
+          merge-multiple: true
+          skip-decompress: true
+      - name: Install and test wheel
+        run: |
+          docker run --rm -v ".:/src" -w /src mirror.gcr.io/library/python:3.12-alpine sh -ec '
+            apk add --no-cache make
+            python -m pip install --upgrade "pip>=25.1"
+            python -m pip install --only-binary=:all: --group dev-pillow-latest wheels/*.whl libheif-binary
+            rm -rf HeifImagePlugin.py _heif_image_plugin
+            make test
+          '
+      - uses: codecov/codecov-action@v7
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+
   macos:
-    name: macOS / ${{ matrix.platform.arch }} / ${{ matrix.runtime.stack }} ${{ matrix.runtime.libheif }} / Pillow latest
-    needs: build-extension
+    name: macOS / ${{ matrix.platform.arch }} / bundled / Pillow latest
+    needs: build-macos
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 5
     strategy:
@@ -118,11 +219,6 @@ jobs:
         platform:
           - { arch: amd64, runner: macos-15-intel }
           - { arch: arm64, runner: macos-15 }
-        runtime:
-          - { stack: bundled }
-          - { stack: brew }
-    env:
-      HEIF_IMAGE_PLUGIN_EXTEND_PATH: '1'
     steps:
       - uses: actions/checkout@v7
 
@@ -140,22 +236,11 @@ jobs:
       - name: Install dependencies and wheel
         run: |
           pip install --upgrade 'pip>=25.1'
-          pip install --only-binary=heif-image-plugin --group dev-pillow-latest wheels/*.whl
-
-      - name: Install bundled libheif
-        if: matrix.runtime.stack == 'bundled'
-        run: pip install "libheif-binary"
-
-      - name: Install Homebrew libheif
-        if: matrix.runtime.stack == 'brew'
-        run: |
-          brew install libheif
-          echo "HOMEBREW_PREFIX=$(brew --prefix)" >> "$GITHUB_ENV"
+          pip install --only-binary=heif-image-plugin --group dev-pillow-latest wheels/*.whl libheif-binary
+          rm -rf HeifImagePlugin.py _heif_image_plugin
 
       - name: Test
-        run: |
-          python -c 'import HeifImagePlugin'
-          make test
+        run: make test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7

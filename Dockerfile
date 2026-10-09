@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 
 # -------------------------------- libheif-bundled -------------------------------------
-FROM libheif-system AS libheif-bundled
+FROM base AS libheif-bundled
 
 ARG LIBHEIF_BINARY=1.23.*
 

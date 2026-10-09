@@ -1,8 +1,4 @@
-import ctypes
-import os
-import sys
 import warnings
-from pathlib import Path
 
 
 # Transformation APIs exist in 1.16, but 1.17 adds heif_properties.h and
@@ -40,22 +36,9 @@ _library_handle, HEIF_ENC_BIN = _load_bundled_library()
 try:
     from ._libheif import ffi, lib  # noqa: F401
 except ImportError as error:
-    if _library_handle is None and sys.platform == 'darwin':
-        prefix = os.environ.get('HOMEBREW_PREFIX', '/opt/homebrew')
-        candidate = Path(prefix) / 'lib' / 'libheif.dylib'
-        if candidate.is_file():
-            dylib = str(candidate)
-            try:
-                _library_handle = ctypes.CDLL(dylib, mode=ctypes.RTLD_LOCAL)
-                from ._libheif import ffi, lib  # noqa: F401
-            except (OSError, ImportError) as homebrew_error:
-                error = homebrew_error
-            else:
-                error = None
-    if error is not None:
-        raise ImportError(
-            f'Cannot load libheif extension. {INSTALL_HINT}'
-        ) from error
+    raise ImportError(
+        f'Cannot load libheif extension. {INSTALL_HINT}'
+    ) from error
 
 
 version_number = lib.heif_get_version_number()
