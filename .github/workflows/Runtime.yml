@@ -13,7 +13,6 @@ jobs:
         platform:
           - { os: linux, arch: amd64, runner: ubuntu-24.04 }
           - { os: linux, arch: arm64, runner: ubuntu-24.04-arm }
-          - { os: macos, arch: amd64, runner: macos-15-intel }
           - { os: macos, arch: arm64, runner: macos-15 }
     steps:
       - uses: actions/checkout@v7
@@ -55,6 +54,9 @@ jobs:
           - { stack: bundled, libheif: '1.23.*' }
           - { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc' }
           - { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc', pillow: prod }
+        exclude:
+          - platform: { arch: arm64, wheel_arch: aarch64, runner: ubuntu-24.04-arm }
+            runtime: { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc', pillow: prod }
 
     steps:
       - uses: actions/checkout@v7
@@ -73,6 +75,9 @@ jobs:
 
       - name: Build test image
         uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           target: libheif-${{ matrix.runtime.stack }}
@@ -111,8 +116,8 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - { arch: amd64, wheel_arch: x86_64, runner: macos-15-intel }
-          - { arch: arm64, wheel_arch: arm64, runner: macos-15 }
+          - { arch: amd64, runner: macos-15-intel }
+          - { arch: arm64, runner: macos-15 }
         runtime:
           - { stack: bundled }
           - { stack: brew }
@@ -127,7 +132,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: '*-macosx_*_${{ matrix.platform.wheel_arch }}.whl'
+          pattern: '*-macosx_*_universal2.whl'
           path: wheels
           merge-multiple: true
           skip-decompress: true
@@ -148,7 +153,9 @@ jobs:
           echo "HOMEBREW_PREFIX=$(brew --prefix)" >> "$GITHUB_ENV"
 
       - name: Test
-        run: make test
+        run: |
+          python -c 'import HeifImagePlugin'
+          make test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7

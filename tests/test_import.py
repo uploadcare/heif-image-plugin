@@ -15,8 +15,9 @@ def test_extension_search_requires_opt_in_and_keeps_local_priority(
         monkeypatch.delenv('HEIF_IMAGE_PLUGIN_EXTEND_PATH', raising=False)
     else:
         monkeypatch.setenv('HEIF_IMAGE_PLUGIN_EXTEND_PATH', extend_path_value)
-    local = tmp_path / 'local' / '_heif_image_plugin'
-    installed = tmp_path / 'installed' / '_heif_image_plugin'
+    # Use a distinct package name so editable installs cannot supply submodules.
+    local = tmp_path / 'local' / '_test_heif_image_plugin'
+    installed = tmp_path / 'installed' / '_test_heif_image_plugin'
     local.mkdir(parents=True)
     installed.mkdir(parents=True)
     local.joinpath('__init__.py').write_text(
@@ -32,7 +33,7 @@ def test_extension_search_requires_opt_in_and_keeps_local_priority(
     result = subprocess.run(
         [sys.executable, '-c',
          'import sys; sys.path[:0] = sys.argv[1:]; '
-         'from _heif_image_plugin import reader, _libheif; '
+         'from _test_heif_image_plugin import reader, _libheif; '
          'print(reader.source, _libheif.source)',
          str(local.parent), str(installed.parent)],
         cwd=tmp_path, capture_output=True, text=True,

@@ -166,7 +166,7 @@ def test_file_transformations_match_libheif():
 
 
 @pytest.mark.xfail(
-    (1, 19, 0) <= libheif_version < (1, 22, 0),
+    (1, 19, 0) <= libheif_version < (1, 23, 0),
     reason='libheif cannot decode this alpha/crop image',
     strict=True,
 )
