@@ -10,8 +10,6 @@
 A HEIF/HEIC and AVIF plugin for [Pillow](https://pillow.readthedocs.io/)
 based on [libheif](https://github.com/strukturag/libheif).
 
-Originally based on the [pyheif-pillow-opener](https://github.com/ciotto/pyheif-pillow-opener)
-code from Christian Bianciotto.
 
 ## Installation
 
@@ -19,16 +17,17 @@ You can install **heif-image-plugin** from *PyPI*:
 
 `pip install heif-image-plugin`
 
-To install bundled libheif and codecs:
+### Bundled libheif and codecs
 
 ```bash
 pip install 'heif-image-plugin[libheif]'
 ```
 
-The plugin uses `libheif-binary` when installed; otherwise, it requires system
-libheif. Saving images uses the native libheif API and requires a HEVC or AV1 encoder.
+The `[libheif]` extra installs the `libheif-binary` package, which provides libheif
+and codecs. The plugin uses this package when installed; otherwise, it requires
+system libheif.
 
-### System libheif
+### Ubuntu system libheif
 
 Ubuntu 24.04:
 
@@ -105,6 +104,7 @@ subsampling; omit `subsampling` or set it to `'420'`:
 image.save('test.avif', encoder='svt', subsampling='420')
 ```
 
+
 ## How to contribute
 
 Contributions are welcome:
@@ -114,7 +114,8 @@ Contributions are welcome:
 3. Start a development shell: `make docker_shell`.
 4. Make your changes and add tests.
 5. Run `make lint` and `make test` inside the container.
-6. Commit your changes on a new branch and open a pull request.
+6. Commit your changes on a new branch and open a pull request against
+   [uploadcare/heif-image-plugin](https://github.com/uploadcare/heif-image-plugin).
 
 ### Building from source
 
@@ -132,6 +133,22 @@ pip install --no-build-isolation .
 
 
 ## Changelog
+
+### 0.9.0
+
+* Reading and saving now use libheif directly. The `pyheif` dependency is removed.
+  The `heif-enc` executable and `HEIF_ENC_BIN` setting are no longer used.
+* Added the `[libheif]` installation extra, which installs `libheif-binary`.
+  Without this extra, system libheif 1.17 or later is required.
+* Wheels for CPython 3.9+ are provided for Linux (glibc 2.28+ and musl 1.2+, on
+  x86_64 and ARM64) and macOS 11+ (universal2).
+  Other platforms require a source build, as does using libheif from Homebrew.
+* Decoding errors now use `HeifImagePlugin.HeifError` instead of
+  `pyheif.error.HeifError`.
+* Changed default chroma downsampling from `average` to `best`: uses `sharp-yuv`
+  when possible, and `average` otherwise.
+* Added saving of palette images (`P` and `PA` modes), including transparency.
+* Saving now preserves the displayed EXIF orientation across supported libheif versions.
 
 ### 0.8.1
 
@@ -210,3 +227,9 @@ target in the `Makefile` to install it.
 * Fill `info['icc_profile']` on loading.
 * Close and release file pointer after loading.
 * Decoding without custom HeifDecoder(ImageFile.PyDecoder).
+
+
+## Acknowledgments
+
+This project started with Christian Bianciotto’s
+[pyheif-pillow-opener](https://github.com/ciotto/pyheif-pillow-opener).
