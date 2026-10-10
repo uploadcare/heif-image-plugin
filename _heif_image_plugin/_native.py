@@ -18,7 +18,6 @@ def _load_bundled_library():
             raise
     else:
         try:
-            encoder = libheif_binary.get_executable('heif-enc')
             handle = libheif_binary.load_library()
         except (OSError, ValueError, AttributeError) as error:
             warnings.warn(
@@ -26,12 +25,12 @@ def _load_bundled_library():
                 RuntimeWarning, stacklevel=2,
             )
         else:
-            return handle, encoder
+            return handle
 
-    return None, 'heif-enc'
+    return None
 
 
-_library_handle, HEIF_ENC_BIN = _load_bundled_library()
+_library_handle = _load_bundled_library()
 
 try:
     from ._libheif import ffi, lib  # noqa: F401

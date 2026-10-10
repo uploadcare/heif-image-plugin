@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "heif-image-plugin"
-version = "0.8.1"
+version = "0.9.0b1"
 description = "A HEIF/HEIC and AVIF plugin for Pillow based on libheif."
 readme = "README.md"
 requires-python = ">=3.9"
