@@ -3,7 +3,6 @@ import ctypes
 import gc
 import sys
 import sysconfig
-from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -71,40 +70,37 @@ def import_native(monkeypatch):
     return execute, extension_import, extension
 
 
-def test_bundled_library_and_native_encoder(bundled, system):
-    module, expected_encoder = bundled
-    handle, encoder = _native._load_bundled_library()
+def test_bundled_library_loading(bundled, system):
+    module, _ = bundled
+    handle = _native._load_bundled_library()
     assert handle is module.load_library.return_value
-    assert encoder == expected_encoder
-    assert Path(encoder).is_absolute()
     module.load_library.assert_called_once_with()
     module.get_version.assert_not_called()
     module.get_version_str.assert_not_called()
-    module.get_executable.assert_called_once_with('heif-enc')
+    module.get_executable.assert_not_called()
     ctypes.CDLL.assert_not_called()
 
 
 def test_bundled_version_api_is_not_required(bundled, system):
-    module, encoder = bundled
+    module, _ = bundled
     del module.get_version
     del module.get_version_str
-    assert _native._load_bundled_library() == (
-        module.load_library.return_value, encoder)
+    assert _native._load_bundled_library() is module.load_library.return_value
 
 
-def test_bundled_encoder_error_warns_before_loading(bundled, system):
+def test_bundled_encoder_is_not_required(bundled, system):
     module, _ = bundled
     module.get_executable.side_effect = OSError('missing encoder')
-    with pytest.warns(RuntimeWarning, match='missing encoder'):
-        assert _native._load_bundled_library() == (None, 'heif-enc')
-    module.load_library.assert_not_called()
+    assert _native._load_bundled_library() is module.load_library.return_value
+    module.get_executable.assert_not_called()
+    module.load_library.assert_called_once_with()
 
 
 def test_bundled_load_error_warns_and_uses_system(bundled, system):
     module, _ = bundled
     module.load_library.side_effect = OSError('broken bundle')
     with pytest.warns(RuntimeWarning, match='broken bundle'):
-        assert _native._load_bundled_library() == (None, 'heif-enc')
+        assert _native._load_bundled_library() is None
     ctypes.CDLL.assert_not_called()
 
 
@@ -113,7 +109,7 @@ def test_absent_bundle_imports_system_without_preloading(
     monkeypatch.setitem(sys.modules, 'libheif_binary', None)
     execute, extension_import, _ = import_native
     namespace = execute()
-    assert namespace['HEIF_ENC_BIN'] == 'heif-enc'
+    assert 'HEIF_ENC_BIN' not in namespace
     assert namespace['_library_handle'] is None
     extension_import.assert_called_once_with()
     ctypes.CDLL.assert_not_called()
@@ -153,15 +149,6 @@ def test_unresolved_import_adds_hint_and_preserves_cause(
         execute()
     assert caught.value.__cause__ is error
     ctypes.CDLL.assert_not_called()
-
-
-def test_encoder_override_reaches_subprocess():
-    with mock.patch('HeifImagePlugin.HEIF_ENC_BIN', '/custom/heif-enc'):
-        with mock.patch('HeifImagePlugin.subprocess.Popen',
-                        side_effect=FileNotFoundError) as enc:
-            with pytest.raises(FileNotFoundError):
-                Image.new('RGB', (1, 1)).save(BytesIO(), 'HEIF')
-    assert enc.call_args.args[0][0] == '/custom/heif-enc'
 
 
 @pytest.fixture

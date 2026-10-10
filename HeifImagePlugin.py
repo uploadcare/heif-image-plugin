@@ -1,10 +1,12 @@
-import subprocess
-import tempfile
+from __future__ import annotations
 
-from PIL import Image, ImageFile
+from functools import lru_cache
+from io import BytesIO
 
-from _heif_image_plugin import reader
-from _heif_image_plugin._native import HEIF_ENC_BIN, libheif_version
+from PIL import ExifTags, Image, ImageFile, ImageOps
+
+from _heif_image_plugin import reader, writer
+from _heif_image_plugin._native import libheif_version
 from _heif_image_plugin.errors import Errors, HeifError, LibheifError  # noqa: F401
 from _heif_image_plugin.metadata import (
     extract_heif_exif as _extract_heif_exif, rotate_heif_file as _rotate_heif_file)
@@ -96,92 +98,118 @@ def check_heif_magic(data):
     return reader.check(data)
 
 
-is_buggy_la_mode = (1, 17, 0) <= libheif_version <= (1, 18, 2)
+is_buggy_orientation_save = libheif_version < (1, 19, 8)
 
 
-def _save(im, fp, filename):
-    # Save it before subsequent im.save() call
+@lru_cache()
+def _supports_sharp_yuv(avif: bool, encoder: str | None) -> bool:
+    try:
+        writer.write(
+            BytesIO(), bytes(8 * 8 * 3), (8, 8), channels=3,
+            avif=avif, encoder=encoder, quality=50, downsampling='sharp-yuv',
+            encoder_params={} if encoder == 'svt' else {'chroma': '420'})
+    except HeifError as error:
+        if error == Errors.unsupported_color_conversion:
+            return False
+        raise OSError(str(error)) from error
+    return True
+
+
+def _save(im: Image.Image, fp: writer.Output, filename: str) -> None:
     info = im.encoderinfo
 
     if im.mode in ('P', 'PA'):
-        # disbled due to errors in libheif encoder
-        raise IOError("cannot write mode P as HEIF")
+        transparent = (im.mode == 'PA' or 'transparency' in im.info
+                       or (im.palette is not None and im.palette.mode == 'RGBA'))
+        im = im.convert('RGBA' if transparent else 'RGB')
 
-    if im.mode == '1':
-        # to circumvent `heif-enc` bug
+    if im.mode in ('1', 'I', 'I;16', 'I;16B'):
         im = im.convert('L')
 
-    if im.mode == 'LA' and is_buggy_la_mode:
-        im = im.convert('RGBA')
+    if im.mode not in ('RGB', 'RGBA', 'L', 'LA'):
+        raise OSError(f'cannot write mode {im.mode} as HEIF')
 
-    with tempfile.NamedTemporaryFile(suffix='.png') as tmpfile:
-        im.save(
-            tmpfile, format='PNG', optimize=False, compress_level=0,
-            icc_profile=info.get('icc_profile', im.info.get('icc_profile')),
-            exif=info.get('exif', im.info.get('exif'))
-        )
+    avif = info.get('avif')
+    if avif is None and filename:
+        ext = filename.rpartition('.')[2].lower()
+        avif = ext == 'avif'
 
-        cmd = [HEIF_ENC_BIN, '-o', '/dev/stdout', tmpfile.name]
+    encoder = str(info['encoder']) if info.get('encoder') else None
+    is_svt = info.get('encoder') == 'svt'
 
-        avif = info.get('avif')
-        if avif is None and filename:
-            ext = filename.rpartition('.')[2].lower()
-            avif = ext == 'avif'
-        if avif:
-            cmd.append('-A')
+    subsampling = info.get('subsampling')
+    if subsampling is None:
+        subsampling = '420'
+    if subsampling == 0:
+        subsampling = '444'
+    elif subsampling == 1:
+        subsampling = '422'
+    elif subsampling == 2:
+        subsampling = '420'
 
-        if info.get('encoder'):
-            cmd.extend(['-e', str(info['encoder'])])
+    native_params: dict[str, str] = {}
+    if is_svt:
+        if subsampling != '420':
+            raise ValueError('SVT encoder supports only subsampling=420')
+    else:
+        native_params['chroma'] = str(subsampling)
 
-        if info.get('quality') is not None:
-            cmd.extend(['-q', str(info['quality'])])
+    if avif and info.get('concurrency') is not None:
+        native_params['threads'] = str(info['concurrency'])
 
-        cmd.extend(['-C', str(info.get('downsampling') or 'average')])
+    params = dict(info.get('encoder_params') or {})
+    if is_svt and 'chroma' in params:
+        raise ValueError('SVT encoder does not support chroma parameter')
+    if (speed := info.get('speed')) is not None:
+        params.setdefault('speed', speed)
+    for k, v in params.items():
+        native_params[str(k)] = str(v)
 
-        is_svt = info.get('encoder') == 'svt'
-        subsampling = info.get('subsampling')
-        if subsampling is None:
-            subsampling = '420'
-        if subsampling == 0:
-            subsampling = '444'
-        elif subsampling == 1:
-            subsampling = '422'
-        elif subsampling == 2:
-            subsampling = '420'
-        if is_svt:
-            if subsampling != '420':
-                raise ValueError('SVT encoder supports only subsampling=420')
-        else:
-            cmd.extend(['-p', f'chroma={subsampling}'])
+    downsampling = str(info.get('downsampling') or 'best')
+    if downsampling == 'best':
+        chroma = native_params.get('chroma', '420')
+        downsampling = 'average'
+        if (im.mode in ('RGB', 'RGBA') and chroma == '420'
+                and _supports_sharp_yuv(bool(avif), encoder)):
+            downsampling = 'sharp-yuv'
+    if downsampling not in ('nn', 'nearest-neighbor', 'average', 'sharp-yuv'):
+        raise OSError('Undefined chroma downsampling algorithm.')
 
-        if avif and info.get('concurrency') is not None:
-            cmd.extend(['-p', f"threads={info['concurrency']}"])
+    quality = info.get('quality')
+    try:
+        quality = 50 if quality is None else int(quality)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise OSError('Invalid quality factor. Must be between 0 and 100.') from error
+    if not 0 <= quality <= 100:
+        raise OSError('Invalid quality factor. Must be between 0 and 100.')
 
-        params = dict(info.get('encoder_params') or {})
-        if is_svt and 'chroma' in params:
-            raise ValueError('SVT encoder does not support chroma parameter')
-        if (speed := info.get('speed')) is not None:
-            params.setdefault('speed', speed)
-        for k, v in params.items():
-            cmd.extend(['-p', f'{k}={v}'])
+    icc = info.get('icc_profile', im.info.get('icc_profile'))
+    exif = info.get('exif', im.info.get('exif'))
+    orientation = 1
+    if exif:
+        metadata = Image.Exif()
+        metadata.load(exif.tobytes() if isinstance(exif, Image.Exif) else exif)
+        value = metadata.get(ExifTags.Base.Orientation, 1)
+        if value in range(1, 9):
+            orientation = value
+        if is_buggy_orientation_save and orientation != 1:
+            # Older libheif writes unreliable orientation properties.
+            im = im.copy()
+            im.info['exif'] = metadata.tobytes()
+            im = ImageOps.exif_transpose(im)
+            orientation = 1
+        if ExifTags.Base.Orientation in metadata:
+            del metadata[ExifTags.Base.Orientation]
+        exif = metadata.tobytes()
 
-        try:
-            with tempfile.TemporaryFile() as stderr:
-                with subprocess.Popen(
-                    cmd, stdout=subprocess.PIPE, stderr=stderr
-                ) as enc:
-                    for data in iter(lambda: enc.stdout.read(128 * 1024), b''):
-                        fp.write(data)
-                    if enc.wait():
-                        stderr.seek(0)
-                        message = stderr.read().decode(errors='replace').strip()
-                        if not message:
-                            message = f'heif-enc exited with code {enc.returncode}'
-                        raise OSError(message)
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                2, f"Can't find heif encoding binary. Install '{HEIF_ENC_BIN}' "
-                + "or set `HeifImagePlugin.HEIF_ENC_BIN` to full path.")
+    try:
+        writer.write(
+            fp, im.tobytes(), im.size, channels=len(im.getbands()), avif=bool(avif),
+            encoder=encoder, quality=quality, downsampling=downsampling,
+            encoder_params=native_params, icc_profile=icc, exif=exif,
+            orientation=orientation)
+    except HeifError as error:
+        raise OSError(str(error)) from error
 
 
 Image.register_open(HeifImageFile.format, HeifImageFile, check_heif_magic)

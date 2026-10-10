@@ -7,8 +7,8 @@ struct heif_image;
 struct heif_reading_options;
 struct heif_init_params;
 
-enum heif_error_code { ... };
-enum heif_suberror_code { ... };
+enum heif_error_code { heif_error_Encoding_error, ... };
+enum heif_suberror_code { heif_suberror_Cannot_write_output_data, ... };
 struct heif_error {
     enum heif_error_code code;
     enum heif_suberror_code subcode;
@@ -16,9 +16,12 @@ struct heif_error {
 };
 
 enum heif_filetype_result { heif_filetype_no, ... };
-enum heif_colorspace { heif_colorspace_RGB, ... };
-enum heif_chroma { heif_chroma_interleaved_RGB, heif_chroma_interleaved_RGBA, ... };
-enum heif_channel { heif_channel_interleaved, ... };
+enum heif_colorspace { heif_colorspace_RGB, heif_colorspace_monochrome, ... };
+enum heif_chroma {
+    heif_chroma_interleaved_RGB, heif_chroma_interleaved_RGBA,
+    heif_chroma_monochrome, ...
+};
+enum heif_channel { heif_channel_interleaved, heif_channel_Y, heif_channel_Alpha, ... };
 enum heif_color_profile_type {
     heif_color_profile_type_rICC, heif_color_profile_type_prof, ...
 };
@@ -92,3 +95,63 @@ struct heif_error heif_decode_image(
     enum heif_colorspace, enum heif_chroma, const struct heif_decoding_options*);
 const uint8_t* heif_image_get_plane_readonly(const struct heif_image*, enum heif_channel, int*);
 void heif_image_release(const struct heif_image*);
+
+/* Encoding APIs available in libheif 1.17. */
+struct heif_encoder;
+struct heif_encoder_descriptor;
+enum heif_compression_format { heif_compression_HEVC, heif_compression_AV1, ... };
+enum heif_orientation { heif_orientation_normal, ... };
+enum heif_chroma_downsampling_algorithm {
+    heif_chroma_downsampling_nearest_neighbor,
+    heif_chroma_downsampling_average,
+    heif_chroma_downsampling_sharp_yuv, ...
+};
+struct heif_color_conversion_options {
+    enum heif_chroma_downsampling_algorithm preferred_chroma_downsampling_algorithm;
+    uint8_t only_use_preferred_chroma_algorithm;
+    ...;
+};
+struct heif_color_profile_nclx {
+    uint8_t full_range_flag;
+    ...;
+};
+struct heif_encoding_options {
+    struct heif_color_profile_nclx* output_nclx_profile;
+    enum heif_orientation image_orientation;
+    struct heif_color_conversion_options color_conversion_options;
+    ...;
+};
+struct heif_writer {
+    int writer_api_version;
+    struct heif_error (*write)(struct heif_context*, const void*, size_t, void*);
+};
+int heif_get_encoder_descriptors(enum heif_compression_format, const char*,
+                                const struct heif_encoder_descriptor**, int);
+const char* heif_encoder_descriptor_get_id_name(const struct heif_encoder_descriptor*);
+struct heif_error heif_context_get_encoder(
+    struct heif_context*, const struct heif_encoder_descriptor*, struct heif_encoder**);
+void heif_encoder_release(struct heif_encoder*);
+struct heif_error heif_encoder_set_lossy_quality(struct heif_encoder*, int);
+struct heif_error heif_encoder_set_parameter(struct heif_encoder*, const char*, const char*);
+struct heif_error heif_image_create(
+    int, int, enum heif_colorspace, enum heif_chroma, struct heif_image**);
+struct heif_error heif_image_add_plane(struct heif_image*, enum heif_channel, int, int, int);
+uint8_t* heif_image_get_plane(struct heif_image*, enum heif_channel, int*);
+struct heif_error heif_image_set_raw_color_profile(
+    struct heif_image*, const char*, const void*, size_t);
+struct heif_color_profile_nclx* heif_nclx_color_profile_alloc(void);
+void heif_nclx_color_profile_free(struct heif_color_profile_nclx*);
+struct heif_error heif_nclx_color_profile_set_color_primaries(
+    struct heif_color_profile_nclx*, uint16_t);
+struct heif_error heif_nclx_color_profile_set_transfer_characteristics(
+    struct heif_color_profile_nclx*, uint16_t);
+struct heif_error heif_nclx_color_profile_set_matrix_coefficients(
+    struct heif_color_profile_nclx*, uint16_t);
+struct heif_encoding_options* heif_encoding_options_alloc(void);
+void heif_encoding_options_free(struct heif_encoding_options*);
+struct heif_error heif_context_encode_image(
+    struct heif_context*, const struct heif_image*, struct heif_encoder*,
+    const struct heif_encoding_options*, struct heif_image_handle**);
+struct heif_error heif_context_add_exif_metadata(
+    struct heif_context*, const struct heif_image_handle*, const void*, int);
+struct heif_error heif_context_write(struct heif_context*, struct heif_writer*, void*);

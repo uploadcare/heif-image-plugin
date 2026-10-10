@@ -19,14 +19,14 @@ You can install **heif-image-plugin** from *PyPI*:
 
 `pip install heif-image-plugin`
 
-To install bundled libheif, codecs and encoding tools:
+To install bundled libheif and codecs:
 
 ```bash
 pip install 'heif-image-plugin[libheif]'
 ```
 
 The plugin uses `libheif-binary` when installed; otherwise, it requires system
-libheif. Saving images requires bundled or system `heif-enc` with codecs.
+libheif. Saving images uses the native libheif API and requires a HEVC or AV1 encoder.
 
 ### System libheif
 
@@ -34,7 +34,7 @@ Ubuntu 24.04:
 
 ```bash
 apt-get install --no-install-recommends \
-    libheif-examples \
+    libheif1 \
     libheif-plugin-libde265 \
     libheif-plugin-x265 \
     libheif-plugin-aomenc
@@ -52,15 +52,15 @@ import HeifImagePlugin
 
 image = Image.open('test.heic')
 ImageOps.exif_transpose(image, in_place=True)
-# requires bundled or system `heif-enc` with codecs
+# requires libheif with a HEVC or AV1 encoder
 image.save('test.avif')
 ```
 
-To override the encoding executable, assign
-`HeifImagePlugin.HEIF_ENC_BIN = '/path/to/heif-enc'` before saving.
-
 Decoding errors are exposed as `HeifImagePlugin.HeifError`, with `code`,
 `subcode` and `message` fields.
+
+Downsampling defaults to `'best'`, which selects `'sharp-yuv'` for RGB/RGBA images
+with 4:2:0 subsampling when supported, and `'average'` otherwise.
 
 Encoder-specific parameters can be passed when saving:
 
