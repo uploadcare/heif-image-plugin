@@ -81,6 +81,10 @@ Contributions are welcome:
 
 ## Changelog
 
+### 0.8.1
+
+* Added SVT-AV1 support for AVIF encoding with `encoder='svt'` (4:2:0 subsampling only)
+
 ### 0.8.0
 
 * Minimal supported Python version is 3.9
