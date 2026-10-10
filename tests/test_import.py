@@ -45,3 +45,14 @@ def test_extension_search_requires_opt_in_and_keeps_local_priority(
     assert result.returncode == 0, result.stderr
     expected_extension = 'local' if local_extension else 'installed'
     assert result.stdout.strip() == f'local {expected_extension}'
+
+
+def test_native_writer_does_not_import_pillow():
+    result = subprocess.run(
+        [sys.executable, '-c',
+         'import sys; from _heif_image_plugin import writer; '
+         'assert not any(name == "PIL" or name.startswith("PIL.") '
+         'for name in sys.modules)'],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr

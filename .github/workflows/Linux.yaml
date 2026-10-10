@@ -82,7 +82,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            libheif1 libheif-examples \
+            libheif1 \
             libheif-plugin-libde265 libheif-plugin-x265 libheif-plugin-aomenc
 
       - if: matrix.runtime.stack == 'bundled'

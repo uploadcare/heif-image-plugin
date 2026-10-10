@@ -26,14 +26,14 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 
 # -------------------------------- libheif-system --------------------------------------
-# libheif and binaries from system packages (1.17.6)
+# libheif and codecs from system packages (1.17.6)
 FROM base AS libheif-system
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
     && apt-get install --no-install-recommends -y \
-        libheif1 libheif-examples \
+        libheif1 \
         libheif-plugin-libde265 libheif-plugin-x265 libheif-plugin-aomenc
 
 
