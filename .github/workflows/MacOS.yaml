@@ -55,7 +55,8 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: '11.0'
         run: |
           pip install --upgrade pip
-          pip wheel --no-deps --wheel-dir wheels \
+          CFLAGS=$(python -c 'import sysconfig; print(sysconfig.get_config_var("CFLAGS"))')
+          CFLAGS="${CFLAGS} -g0" pip wheel --no-deps --wheel-dir wheels \
             --config-settings=--build-option=--plat-name=macosx_11_0_universal2 .
           pip install packaging
           python .github/scripts/check-wheel.py wheels/*.whl macosx_11_0_universal2

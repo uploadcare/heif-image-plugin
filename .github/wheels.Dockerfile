@@ -11,7 +11,8 @@ WORKDIR /src
 
 COPY . ./
 
-RUN python -m pip wheel --no-deps --wheel-dir /unrepaired . \
+RUN CFLAGS=$(python -c 'import sysconfig; print(sysconfig.get_config_var("CFLAGS"))') \
+    && CFLAGS="${CFLAGS} -g0" python -m pip wheel --no-deps --wheel-dir /unrepaired . \
     && case "$BASE" in \
         manylinux) platform="manylinux_2_28_$(uname -m)" ;; \
         musllinux) platform="musllinux_1_2_$(uname -m)" ;; \
