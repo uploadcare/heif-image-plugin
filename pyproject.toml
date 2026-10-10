@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,13 +8,12 @@ version = "0.8.1"
 description = "A HEIF/HEIC and AVIF plugin for Pillow based on the pyheif library."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Alexander Karpinsky", email = "homm86@gmail.com" },
 ]
 keywords = ["heif", "heic", "Pillow", "plugin", "pyheif"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
