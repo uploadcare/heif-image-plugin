@@ -66,7 +66,7 @@ FROM libheif-${STACK} AS development
 
 ARG PILLOW=latest
 
-COPY --parents pyproject.toml setup.py bindings/ pip-stubs/ ./
+COPY --parents pyproject.toml setup.py bindings/ ./
 # Install the binary extension in site-packages. When /src is mounted,
 # extend_path lets the local Python package import the installed native extension.
 ENV HEIF_IMAGE_PLUGIN_EXTEND_PATH=1

@@ -59,7 +59,6 @@ dev-pillow-latest = [
 ]
 dev-pillow-prod = [
     { include-group = "dev" },
-    "pillow @ file:./pip-stubs/pillow",
     # branch: simd/12.3.x-prod
     "pillow-simd @ git+https://github.com/uploadcare/pillow-simd.git@b4c33a96e58e1896c36fed40e759eed0ab5bab4d",
 ]
