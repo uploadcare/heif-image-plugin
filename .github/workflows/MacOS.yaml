@@ -1,0 +1,74 @@
+name: macOS
+
+on: [push]
+
+jobs:
+  build:
+    name: Build wheel / universal2
+    runs-on: macos-15
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: arm64
+
+      - name: Build wheel
+        env:
+          ARCHFLAGS: '-arch arm64 -arch x86_64'
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: |
+          pip install --upgrade pip
+          pip wheel --no-deps --wheel-dir wheels \
+            --config-settings=--build-option=--plat-name=macosx_11_0_universal2 .
+          pip install packaging
+          python .github/scripts/check-wheel.py wheels/*.whl macosx_11_0_universal2
+
+      - uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          path: wheels/*.whl
+          if-no-files-found: error
+
+  test:
+    name: Test wheel / ${{ matrix.platform.arch }}
+    needs: build
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { arch: amd64, runner: macos-15-intel }
+          - { arch: arm64, runner: macos-15 }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: '*-macosx_*_universal2.whl'
+          path: wheels
+          merge-multiple: true
+          skip-decompress: true
+
+      - name: Install dependencies and wheel
+        run: |
+          pip install --upgrade 'pip>=25.1'
+          pip install --only-binary=heif-image-plugin --group dev-pillow-latest wheels/*.whl libheif-binary
+          rm -rf HeifImagePlugin.py _heif_image_plugin
+
+      - name: Test
+        run: make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
