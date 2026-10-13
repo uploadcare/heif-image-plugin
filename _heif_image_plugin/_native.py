@@ -6,7 +6,7 @@ import warnings
 MIN_VERSION = (1, 17, 0)
 
 INSTALL_HINT = (
-    "Try installing 'heif-image-plugin[libheif]' or 'libheif-binary>=1.17.6.2'."
+    "Try installing 'heif-image-plugin[libheif]' or 'libheif-binary>=1.17.6.4'."
 )
 
 

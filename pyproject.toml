@@ -2,7 +2,7 @@
 requires = [
     "setuptools>=77.0.3",
     "cffi>=1.15.1",
-    "libheif-binary==1.17.6.2; sys_platform == 'linux' or sys_platform == 'darwin'",
+    "libheif-binary==1.17.6.4; sys_platform == 'linux' or sys_platform == 'darwin'",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -40,7 +40,7 @@ libheif = [
     # _heif_image_plugin/_native.py: MIN_VERSION and INSTALL_HINT.
     # Dockerfile: system libheif version in the base image.
     # README.md: minimum supported version.
-    "libheif-binary>=1.17.6.2"
+    "libheif-binary>=1.17.6.4"
 ]
 
 [project.urls]
