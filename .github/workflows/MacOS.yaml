@@ -3,6 +3,40 @@ name: macOS
 on: [push]
 
 jobs:
+  test-homebrew:
+    name: Test source / arm64 / Homebrew libheif
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: arm64
+
+      - name: Check installation fails without libheif
+        run: |
+          pip install 'pip>=25.1' 'setuptools>=77.0.3' 'cffi>=1.15.1'
+          ! pip install --no-build-isolation --no-deps .
+
+      - name: Install Homebrew libheif
+        run: brew install libheif
+
+      - name: Install from source
+        run: |
+          pip install --no-build-isolation --only-binary=pillow --group dev-pillow-latest .
+          rm -rf HeifImagePlugin.py _heif_image_plugin
+
+      - name: Test
+        run: make test
+
+      - uses: codecov/codecov-action@v7
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+
   build:
     name: Build wheel / universal2
     runs-on: macos-15

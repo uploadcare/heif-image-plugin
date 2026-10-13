@@ -42,6 +42,28 @@ apt-get install --no-install-recommends \
 
 Minimal supported libheif version is 1.17.x.
 
+### macOS with Homebrew
+
+The macOS wheel expects `@rpath/libheif.1.dylib`, while Homebrew's libheif uses
+an absolute install name. Build the extension against Homebrew's library so it
+records the correct path.
+
+With a C compiler and Python development headers available, run the following
+from the repository root in a Python environment without `libheif-binary`:
+
+```bash
+brew install libheif
+pip install 'setuptools>=77.0.3' 'cffi>=1.15.1'
+pip install --no-build-isolation .
+```
+
+`--no-build-isolation` prevents pip from installing `libheif-binary`
+as a build dependency.
+On macOS, the build automatically detects Homebrew's libheif when `brew` is
+on `PATH` and `libheif-binary` is absent. If Homebrew's libheif is not installed,
+the build uses the standard system library search.
+
+
 ## How to use
 
 Just import once before opening an image.
