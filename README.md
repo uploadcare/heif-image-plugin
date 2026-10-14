@@ -138,6 +138,7 @@ pip install --no-build-isolation .
 
 * Reading and saving now use libheif directly. The `pyheif` dependency is removed.
   The `heif-enc` executable and `HEIF_ENC_BIN` setting are no longer used.
+  Saving no longer uses temporary files or subprocesses.
 * Added the `[libheif]` installation extra, which installs `libheif-binary`.
   Without this extra, system libheif 1.17 or later is required.
 * Wheels for CPython 3.9+ are provided for Linux (glibc 2.28+ and musl 1.2+, on
@@ -145,9 +146,13 @@ pip install --no-build-isolation .
   Other platforms require a source build, as does using libheif from Homebrew.
 * Decoding errors now use `HeifImagePlugin.HeifError` instead of
   `pyheif.error.HeifError`.
+* Native decoding limits now follow Pillow's `Image.MAX_IMAGE_PIXELS` error
+  threshold. Setting it to `None` disables the native pixel and memory limits.
 * Changed default chroma downsampling from `average` to `best`: uses `sharp-yuv`
   when possible, and `average` otherwise.
 * Added saving of palette images (`P` and `PA` modes), including transparency.
+* Grayscale images with alpha (`LA` mode) are now encoded directly, without
+  converting to RGBA on older libheif versions.
 * Saving now preserves the displayed EXIF orientation across supported libheif versions.
 
 ### 0.8.1

@@ -3,7 +3,7 @@ from io import BytesIO
 from unittest import mock
 
 import pytest
-from PIL import Image, ImageCms, ImageOps
+from PIL import Image, ImageCms, ImageFile, ImageOps
 
 from _heif_image_plugin import reader
 from _heif_image_plugin.errors import HeifError
@@ -146,15 +146,18 @@ def test_orientation(orientation, orientation_ref_image):
     assert max(avg_diffs) <= 0.02
 
 
-def test_not_load_truncated():
+def test_not_load_truncated(monkeypatch):
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', False)
     image = Image.open(respath('test-crop.heic'))
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', True)
     with pytest.raises(HeifError):
         image.load()
 
 
 @mock.patch('PIL.ImageFile.LOAD_TRUNCATED_IMAGES', True)
-def test_load_truncated():
+def test_load_truncated(monkeypatch):
     image = Image.open(respath('test-crop.heic'))
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', False)
     image.load()
 
 

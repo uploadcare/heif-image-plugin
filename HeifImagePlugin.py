@@ -62,6 +62,7 @@ class HeifImageFile(ImageFile.ImageFile):
 
     def _open(self):
         self.tile = []
+        self._load_truncated_images = ImageFile.LOAD_TRUNCATED_IMAGES
         self.heif_file = self._open_heif_file(False)
 
     def load(self):
@@ -70,7 +71,7 @@ class HeifImageFile(ImageFile.ImageFile):
             try:
                 try:
                     heif_file = heif_file.load(
-                        strict_decoding=not ImageFile.LOAD_TRUNCATED_IMAGES)
+                        strict_decoding=not self._load_truncated_images)
                 except HeifError as e:
                     if e != Errors.unsupported_color_conversion:
                         raise
@@ -78,11 +79,11 @@ class HeifImageFile(ImageFile.ImageFile):
                     # https://github.com/strukturag/libheif/issues/1273
                     self.fp.seek(0)
                     heif_file = self._open_heif_file(True).load(
-                        strict_decoding=not ImageFile.LOAD_TRUNCATED_IMAGES)
+                        strict_decoding=not self._load_truncated_images)
             except HeifError as e:
                 # Ignore EOF error and return blank image otherwise
                 cropped_file = e == Errors.end_of_file
-                if not cropped_file or not ImageFile.LOAD_TRUNCATED_IMAGES:
+                if not cropped_file or not self._load_truncated_images:
                     raise
 
             self.load_prepare()

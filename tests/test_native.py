@@ -254,21 +254,24 @@ def test_decode_error_releases_image_handle_and_context(native_spy):
     native_spy.heif_context_free.assert_called_once()
 
 
-def test_strict_decoding_uses_flag_at_load_time(monkeypatch, native_spy):
+@pytest.mark.parametrize('allow_truncated', [False, True])
+def test_strict_decoding_uses_flag_at_open_time(
+        monkeypatch, native_spy, allow_truncated):
     strict_values = []
 
     def decode(*args):
         strict_values.append(args[-1].strict_decoding)
+        if len(strict_values) == 1:
+            raise HeifError(code=4, subcode=3003,
+                            message='Unsupported color conversion')
         return _native.lib.heif_decode_image(*args)
 
     native_spy.heif_decode_image.side_effect = decode
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', allow_truncated)
     image = Image.open(respath('test2.heic'))
-    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', True)
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', not allow_truncated)
     image.load()
-    assert strict_values == [0]
-    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', False)
-    Image.open(respath('test2.heic')).load()
-    assert strict_values == [0, 1]
+    assert strict_values == [int(not allow_truncated)] * 2
 
 
 def test_error_fields_and_classification_are_preserved():
