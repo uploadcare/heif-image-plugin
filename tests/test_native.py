@@ -192,6 +192,45 @@ def test_open_error_releases_context(native_spy):
     native_spy.heif_context_free.assert_called_once()
 
 
+def test_image_initialization_error_releases_handle_and_context(
+        monkeypatch, native_spy):
+    error = ValueError('invalid metadata')
+    monkeypatch.setattr(reader, 'read_metadata', mock.Mock(side_effect=error))
+    releases = mock.Mock()
+    releases.attach_mock(native_spy.heif_image_handle_release, 'handle')
+    releases.attach_mock(native_spy.heif_context_free, 'context')
+
+    with pytest.raises(ValueError) as caught:
+        reader.open(Path(respath('test2.heic')).read_bytes())
+    assert caught.value is error
+    assert releases.mock_calls == [mock.call.handle(mock.ANY),
+                                   mock.call.context(mock.ANY)]
+
+
+def test_handle_acquisition_error_releases_allocated_handle_and_context(native_spy):
+    message = reader.ffi.new('char[]', b'handle failure')
+    error = reader.ffi.new('struct heif_error *', {
+        'code': 7, 'subcode': 100, 'message': message,
+    })
+
+    def fail_after_allocating(*args):
+        result = _native.lib.heif_context_get_primary_image_handle(*args)
+        assert result.code == 0
+        return error[0]
+
+    native_spy.heif_context_get_primary_image_handle.side_effect = fail_after_allocating
+    releases = mock.Mock()
+    releases.attach_mock(native_spy.heif_image_handle_release, 'handle')
+    releases.attach_mock(native_spy.heif_context_free, 'context')
+
+    with pytest.raises(HeifError) as caught:
+        reader.open(Path(respath('test2.heic')).read_bytes())
+    assert (caught.value.code, caught.value.subcode, caught.value.message) == (
+        7, 100, 'handle failure')
+    assert releases.mock_calls == [mock.call.handle(mock.ANY),
+                                   mock.call.context(mock.ANY)]
+
+
 def test_decode_error_releases_image_handle_and_context(native_spy):
     message = reader.ffi.new('char[]', b'decode failure')
     error = reader.ffi.new('struct heif_error *', {

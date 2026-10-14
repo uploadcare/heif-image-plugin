@@ -180,10 +180,10 @@ def _save(im: Image.Image, fp: writer.Output, filename: str) -> None:
     quality = info.get('quality')
     try:
         quality = 50 if quality is None else int(quality)
+        if not 0 <= quality <= 100:
+            raise ValueError('Must be between 0 and 100.')
     except (TypeError, ValueError, OverflowError) as error:
-        raise OSError('Invalid quality factor. Must be between 0 and 100.') from error
-    if not 0 <= quality <= 100:
-        raise OSError('Invalid quality factor. Must be between 0 and 100.')
+        raise OSError('Invalid quality factor.') from error
 
     icc = info.get('icc_profile', im.info.get('icc_profile'))
     exif = info.get('exif', im.info.get('exif'))
