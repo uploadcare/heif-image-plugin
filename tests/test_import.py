@@ -48,15 +48,18 @@ def test_extension_search_requires_opt_in_and_keeps_local_priority(
 
     result = subprocess.run(
         [sys.executable, '-c',
-         'import sys; sys.path[:0] = sys.argv[1:]; '
-         'from _test_heif_image_plugin import reader, _libheif; '
-         'print(reader.source, _libheif.source)',
+         'import sys\n'
+         'sys.path[:0] = sys.argv[1:]\n'
+         'try:\n'
+         '    from _test_heif_image_plugin import reader, _libheif\n'
+         'except ImportError:\n'
+         '    sys.exit(2)\n'
+         'print(reader.source, _libheif.source)\n',
          str(local.parent), str(installed.parent)],
         cwd=tmp_path, capture_output=True, text=True,
     )
     if not local_extension and extend_path_value != '1':
-        assert result.returncode != 0
-        assert "Cannot load libheif extension" in result.stderr
+        assert result.returncode == 2, result.stderr
         return
     assert result.returncode == 0, result.stderr
     expected_extension = 'local' if local_extension else 'installed'

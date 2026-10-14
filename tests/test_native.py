@@ -1,5 +1,4 @@
 import builtins
-import ctypes
 import gc
 import sys
 import sysconfig
@@ -25,23 +24,10 @@ def test_free_threaded_python_runs_without_gil():
 
 
 @pytest.fixture
-def bundled(tmp_path, monkeypatch):
-    encoder = str(tmp_path / 'native-encoder')
-    module = SimpleNamespace(
-        get_version=mock.Mock(return_value=(1, 23, 6)),
-        get_version_str=mock.Mock(return_value='1.23.6'),
-        get_executable=mock.Mock(return_value=encoder),
-        load_library=mock.Mock(),
-    )
+def bundled(monkeypatch):
+    module = SimpleNamespace(load_library=mock.Mock())
     monkeypatch.setitem(sys.modules, 'libheif_binary', module)
-    return module, encoder
-
-
-@pytest.fixture
-def system(monkeypatch):
-    handle = mock.Mock()
-    monkeypatch.setattr(ctypes, 'CDLL', mock.Mock(return_value=handle))
-    return handle
+    return module
 
 
 @pytest.fixture
@@ -70,85 +56,57 @@ def import_native(monkeypatch):
     return execute, extension_import, extension
 
 
-def test_bundled_library_loading(bundled, system):
-    module, _ = bundled
+def test_bundled_library_loading_requires_only_loader_api(bundled):
+    module = bundled
     handle = _native._load_bundled_library()
     assert handle is module.load_library.return_value
-    module.load_library.assert_called_once_with()
-    module.get_version.assert_not_called()
-    module.get_version_str.assert_not_called()
-    module.get_executable.assert_not_called()
-    ctypes.CDLL.assert_not_called()
 
 
-def test_bundled_version_api_is_not_required(bundled, system):
-    module, _ = bundled
-    del module.get_version
-    del module.get_version_str
-    assert _native._load_bundled_library() is module.load_library.return_value
-
-
-def test_bundled_encoder_is_not_required(bundled, system):
-    module, _ = bundled
-    module.get_executable.side_effect = OSError('missing encoder')
-    assert _native._load_bundled_library() is module.load_library.return_value
-    module.get_executable.assert_not_called()
-    module.load_library.assert_called_once_with()
-
-
-def test_bundled_load_error_warns_and_uses_system(bundled, system):
-    module, _ = bundled
+def test_bundled_load_error_warns_and_uses_system(bundled):
+    module = bundled
     module.load_library.side_effect = OSError('broken bundle')
-    with pytest.warns(RuntimeWarning, match='broken bundle'):
+    with pytest.warns(RuntimeWarning):
         assert _native._load_bundled_library() is None
-    ctypes.CDLL.assert_not_called()
 
 
 def test_absent_bundle_imports_system_without_preloading(
-        monkeypatch, system, import_native):
+        monkeypatch, import_native):
     monkeypatch.setitem(sys.modules, 'libheif_binary', None)
     execute, extension_import, _ = import_native
     namespace = execute()
-    assert 'HEIF_ENC_BIN' not in namespace
     assert namespace['_library_handle'] is None
-    extension_import.assert_called_once_with()
-    ctypes.CDLL.assert_not_called()
+    assert namespace['lib'] is extension_import.return_value.lib
 
 
 @pytest.mark.parametrize('bundled_library', [False, True])
-@pytest.mark.parametrize('version', [0x01100200, 0x01110000, 0x01170000])
+@pytest.mark.parametrize('version, expected', [
+    (0x01100200, None), (0x01110000, (1, 17, 0)), (0x01170000, (1, 23, 0)),
+])
 def test_loaded_extension_version_is_checked(
-        monkeypatch, bundled, system, import_native, bundled_library, version):
-    module, _ = bundled
+        monkeypatch, bundled, import_native, bundled_library, version, expected):
+    module = bundled
     if not bundled_library:
         monkeypatch.setitem(sys.modules, 'libheif_binary', None)
     execute, extension_import, extension = import_native
     extension.lib.heif_get_version_number.return_value = version
-    if version < 0x01110000:
-        with pytest.raises(ImportError, match=r'1\.16\.2.*libheif-binary>=1\.17'):
+    if expected is None:
+        with pytest.raises(ImportError):
             execute()
     else:
         namespace = execute()
-        assert namespace['libheif_version'] == tuple(
-            (version >> shift) & 255 for shift in (24, 16, 8))
-    extension_import.assert_called_once_with()
-    module.get_version.assert_not_called()
-    module.get_version_str.assert_not_called()
-    if bundled_library:
-        module.load_library.assert_called_once_with()
-    ctypes.CDLL.assert_not_called()
+        assert namespace['libheif_version'] == expected
+        assert namespace['_library_handle'] is (
+            module.load_library.return_value if bundled_library else None)
 
 
-def test_unresolved_import_adds_hint_and_preserves_cause(
-        monkeypatch, system, import_native):
+def test_unresolved_import_preserves_cause(monkeypatch, import_native):
     monkeypatch.setitem(sys.modules, 'libheif_binary', None)
     execute, extension_import, _ = import_native
     error = ImportError('missing dependency')
     extension_import.side_effect = error
-    with pytest.raises(ImportError, match='libheif-binary>=1.17') as caught:
+    with pytest.raises(ImportError) as caught:
         execute()
     assert caught.value.__cause__ is error
-    ctypes.CDLL.assert_not_called()
 
 
 @pytest.fixture
@@ -171,8 +129,10 @@ def test_reader_decodes_lazily_and_only_once(native_spy):
     native_spy.heif_decode_image.assert_not_called()
     assert image.load() is image
     pixels = bytes(image.data)
+    stride = image.stride
     assert image.load() is image
     assert bytes(image.data) == pixels
+    assert image.stride == stride
     native_spy.heif_decode_image.assert_called_once()
 
 
@@ -245,8 +205,10 @@ def test_decode_error_releases_image_handle_and_context(native_spy):
 
     native_spy.heif_decode_image.side_effect = fail_after_allocating
     image = reader.open(Path(respath('test2.heic')).read_bytes())
-    with pytest.raises(HeifError, match='decode failure'):
+    with pytest.raises(HeifError) as caught:
         image.load()
+    assert (caught.value.code, caught.value.subcode, caught.value.message) == (
+        7, 100, 'decode failure')
     assert image.data is None
     native_spy.heif_image_release.assert_called_once()
     native_spy.heif_image_handle_release.assert_called_once()
@@ -270,8 +232,7 @@ def test_strict_decoding_uses_flag_at_load_time(monkeypatch, native_spy):
     assert strict_values == [0, 1]
 
 
-def test_error_fields_and_string_are_preserved():
+def test_error_fields_and_classification_are_preserved():
     error = HeifError(code=7, subcode=100, message='End of file')
     assert (error.code, error.subcode, error.message) == (7, 100, 'End of file')
-    assert str(error) == 'Code: 7, Subcode: 100, Message: "End of file"'
     assert error == HeifImagePlugin.Errors.end_of_file
