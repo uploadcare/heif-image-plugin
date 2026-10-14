@@ -1,4 +1,4 @@
-ARG STACK=system
+ARG STACK=bundled
 
 # -------------------------------- base ------------------------------------------------
 # Ubuntu 24.04 comes with libheif 1.17.6, the minimum supported version.

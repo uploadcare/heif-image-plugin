@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import atexit
 
+from . import _security
 from ._native import ffi, lib
 from .errors import assert_success
 from .metadata import read_color_profile, read_metadata
@@ -37,6 +40,11 @@ class HeifImage:
         self.exif = None
         self.data = None
         self.stride = None
+
+    def set_max_pixels(self, max_pixels: int | None) -> None:
+        if self._context is None:
+            raise ValueError('Cannot set max_pixels after loading or closing')
+        _security.set_max_pixels(self._context, max_pixels)
 
     def load(self, *, strict_decoding: bool = True) -> 'HeifImage':
         if self._handle is None:

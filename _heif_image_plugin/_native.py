@@ -1,3 +1,5 @@
+import os
+import sys
 import warnings
 
 
@@ -8,6 +10,12 @@ MIN_VERSION = (1, 17, 0)
 INSTALL_HINT = (
     "Try installing 'heif-image-plugin[libheif]' or 'libheif-binary>=1.17.6.4'."
 )
+
+# Let local Python sources use the native extension installed in site-packages.
+if os.environ.get('HEIF_IMAGE_PLUGIN_EXTEND_PATH') == '1':
+    from pkgutil import extend_path
+    package = sys.modules[__package__]
+    package.__path__ = extend_path(package.__path__, package.__name__)
 
 
 def _load_bundled_library():

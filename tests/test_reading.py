@@ -66,7 +66,9 @@ def test_open_image_error(open_mock):
 
 
 @mock.patch('_heif_image_plugin.reader.open')
-def test_open_image_metadata(open_mock):
+@pytest.mark.parametrize('max_pixels', [1000, None])
+def test_open_image_metadata(open_mock, monkeypatch, max_pixels):
+    monkeypatch.setattr(Image, 'MAX_IMAGE_PIXELS', max_pixels)
     m = mock.MagicMock()
     m.size = (10, 20)
     m.mode = 'RGB'
@@ -82,6 +84,8 @@ def test_open_image_metadata(open_mock):
 
     assert open_mock.called
     assert image is not None
+    m.set_max_pixels.assert_called_once_with(
+        None if max_pixels is None else 2 * max_pixels)
 
 
 @pytest.mark.parametrize(

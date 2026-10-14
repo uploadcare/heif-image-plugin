@@ -23,6 +23,8 @@ class HeifImageFile(ImageFile.ImageFile):
                 self.fp.read(), apply_transformations=apply_transformations)
         except HeifError as e:
             raise SyntaxError(str(e))
+        heif_file.set_max_pixels(
+            None if Image.MAX_IMAGE_PIXELS is None else 2 * Image.MAX_IMAGE_PIXELS)
 
         _extract_heif_exif(heif_file)
 

@@ -20,7 +20,7 @@ test:
 
 
 ARCH ?= amd64
-STACK ?= system
+STACK ?= bundled
 PILLOW ?=
 LIBHEIF_UC ?=
 LIBHEIF_BINARY ?=

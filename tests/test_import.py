@@ -22,13 +22,29 @@ def test_extension_search_requires_opt_in_and_keeps_local_priority(
     installed.mkdir(parents=True)
     local.joinpath('__init__.py').write_text(
         Path(_heif_image_plugin.__file__).read_text())
+    local.joinpath('_native.py').write_text(
+        Path(_heif_image_plugin._native.__file__).read_text())
+    local.parent.joinpath('libheif_binary.py').write_text(
+        'import sys\n'
+        'def load_library():\n'
+        '    sys.modules["_test_heif_image_plugin"].native_preloaded = True\n')
     local.joinpath('reader.py').write_text('source = "local"')
     installed.joinpath('__init__.py').write_text(
         'raise AssertionError("installed initializer must not run")')
     installed.joinpath('reader.py').write_text('source = "installed"')
-    installed.joinpath('_libheif.py').write_text('source = "installed"')
+    extension_source = (
+        'import sys\n'
+        'assert sys.modules[__package__].native_preloaded\n'
+        'ffi = None\n'
+        'class lib:\n'
+        '    @staticmethod\n'
+        '    def heif_get_version_number():\n'
+        '        return 0x01170000\n'
+        'source = {!r}\n')
+    installed.joinpath('_libheif.py').write_text(
+        extension_source.format('installed'))
     if local_extension:
-        local.joinpath('_libheif.py').write_text('source = "local"')
+        local.joinpath('_libheif.py').write_text(extension_source.format('local'))
 
     result = subprocess.run(
         [sys.executable, '-c',
@@ -40,7 +56,7 @@ def test_extension_search_requires_opt_in_and_keeps_local_priority(
     )
     if not local_extension and extend_path_value != '1':
         assert result.returncode != 0
-        assert "cannot import name '_libheif'" in result.stderr
+        assert "Cannot load libheif extension" in result.stderr
         return
     assert result.returncode == 0, result.stderr
     expected_extension = 'local' if local_extension else 'installed'

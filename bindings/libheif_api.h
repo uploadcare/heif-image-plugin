@@ -51,6 +51,7 @@ void heif_deinit(void);
 enum heif_filetype_result heif_check_filetype(const uint8_t*, int);
 struct heif_context* heif_context_alloc(void);
 void heif_context_free(struct heif_context*);
+void heif_context_set_maximum_image_size_limit(struct heif_context*, int);
 struct heif_error heif_context_read_from_memory_without_copy(
     struct heif_context*, const void*, size_t, const struct heif_reading_options*);
 struct heif_error heif_context_get_primary_image_handle(
