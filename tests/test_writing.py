@@ -252,8 +252,11 @@ def test_subsampling(jungle_ref_image):
 
     with BytesIO() as fp:
         jungle_ref_image.save(fp, 'HEIF', avif=True, quality=90, subsampling=2)
-        with pytest.raises(AssertionError, match='diff'):
-            # Should fail with subsampling=2
+        if reader.is_buggy_420_bilinear:
+            with pytest.raises(AssertionError, match='diff'):
+                compare_with_original(fp, jungle_ref_image, threshold=0, max_diff=0.01)
+        else:
+            # Bilinear decoding brings 4:2:0 within the same quality threshold.
             compare_with_original(fp, jungle_ref_image, threshold=0, max_diff=0.01)
 
     with BytesIO() as fp:

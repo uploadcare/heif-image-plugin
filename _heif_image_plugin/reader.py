@@ -3,7 +3,7 @@ from __future__ import annotations
 import atexit
 
 from . import _security
-from ._native import ffi, lib
+from ._native import ffi, lib, libheif_version
 from .errors import assert_success
 from .metadata import read_color_profile, read_metadata
 from .transformations import read_transformations
@@ -13,11 +13,39 @@ assert_success(lib.heif_init(ffi.NULL))
 atexit.register(lib.heif_deinit)
 
 
+# Fixed by libheif commit 098da51c (AVIF chroma parsing) and PR #1930.
+is_buggy_avif_chroma_reporting = libheif_version < (1, 19, 0)
+is_buggy_420_bilinear = libheif_version < (1, 23, 6)
+
+
 def _keep_alive(release, *refs):
     def callback(pointer):
         release(pointer)
     callback._refs = refs
     return callback
+
+
+def _enable_bilinear_upsampling(handle, options):
+    if is_buggy_avif_chroma_reporting:
+        return
+
+    source_colorspace = ffi.new('enum heif_colorspace *')
+    source_chroma = ffi.new('enum heif_chroma *')
+    error = lib.heif_image_handle_get_preferred_decoding_colorspace(
+        handle, source_colorspace, source_chroma,
+    )
+    if error.code != 0 or source_colorspace[0] != lib.heif_colorspace_YCbCr:
+        return
+    if source_chroma[0] == lib.heif_chroma_420:
+        if is_buggy_420_bilinear:
+            return
+    elif source_chroma[0] not in (lib.heif_chroma_422, lib.heif_chroma_444):
+        return
+
+    conversion = options.color_conversion_options
+    conversion.preferred_chroma_upsampling_algorithm = (
+        lib.heif_chroma_upsampling_bilinear)
+    conversion.only_use_preferred_chroma_algorithm = 1
 
 
 class HeifImage:
@@ -59,6 +87,7 @@ class HeifImage:
         out = ffi.new('struct heif_image **')
         image = None
         try:
+            _enable_bilinear_upsampling(self._handle, options)
             assert_success(lib.heif_decode_image(
                 self._handle, out, lib.heif_colorspace_RGB, chroma, options,
             ))
