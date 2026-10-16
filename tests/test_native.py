@@ -136,6 +136,71 @@ def test_reader_decodes_lazily_and_only_once(native_spy):
     native_spy.heif_decode_image.assert_called_once()
 
 
+@pytest.mark.parametrize('version, avif_bug, bilinear_bug', [
+    ((1, 17, 0), True, True), ((1, 18, 2), True, True),
+    ((1, 19, 0), False, True), ((1, 23, 5), False, True),
+    ((1, 23, 6), False, False),
+])
+def test_reader_chroma_bug_version_boundaries(
+        monkeypatch, version, avif_bug, bilinear_bug):
+    monkeypatch.setattr(_native, 'libheif_version', version)
+    namespace = {'__package__': '_heif_image_plugin'}
+    source = Path(reader.__file__).read_text()
+    library = SimpleNamespace(
+        heif_init=mock.Mock(return_value=SimpleNamespace(code=0)),
+        heif_deinit=mock.Mock(),
+    )
+    with mock.patch.object(_native, 'lib', library), mock.patch('atexit.register'):
+        exec(compile(source, reader.__file__, 'exec'), namespace)
+    assert namespace['is_buggy_avif_chroma_reporting'] is avif_bug
+    assert namespace['is_buggy_420_bilinear'] is bilinear_bug
+
+
+@pytest.mark.parametrize('version', [
+    (1, 17, 0), (1, 18, 2), (1, 19, 0), (1, 23, 5), (1, 23, 6),
+])
+@pytest.mark.parametrize('colorspace, chroma, query_error', [
+    ('YCbCr', '420', False), ('YCbCr', '422', False),
+    ('YCbCr', '444', False), ('monochrome', 'monochrome', False),
+    ('RGB', '422', False), ('YCbCr', 'undefined', False),
+    ('YCbCr', '422', True),
+])
+def test_reader_selects_bilinear_for_safe_source_formats(
+        monkeypatch, native_spy, version, colorspace, chroma, query_error):
+    monkeypatch.setattr(reader, 'is_buggy_avif_chroma_reporting', version < (1, 19, 0))
+    monkeypatch.setattr(reader, 'is_buggy_420_bilinear', version < (1, 23, 6))
+    defaults = reader.ffi.gc(_native.lib.heif_decoding_options_alloc(),
+                             _native.lib.heif_decoding_options_free)
+    conversion = defaults.color_conversion_options
+    expected = (conversion.preferred_chroma_upsampling_algorithm,
+                conversion.only_use_preferred_chroma_algorithm)
+    if (version >= (1, 19, 0) and not query_error and colorspace == 'YCbCr'
+            and (chroma in ('422', '444')
+                 or (chroma == '420' and version >= (1, 23, 6)))):
+        expected = (_native.lib.heif_chroma_upsampling_bilinear, 1)
+
+    def query(handle, out_colorspace, out_chroma):
+        out_colorspace[0] = getattr(_native.lib, 'heif_colorspace_' + colorspace)
+        out_chroma[0] = getattr(_native.lib, 'heif_chroma_' + chroma)
+        return SimpleNamespace(code=4 if query_error else 0)
+
+    observed = []
+
+    def decode(*args):
+        conversion = args[-1].color_conversion_options
+        observed.append((conversion.preferred_chroma_upsampling_algorithm,
+                         conversion.only_use_preferred_chroma_algorithm))
+        return _native.lib.heif_decode_image(*args)
+
+    native_spy.heif_image_handle_get_preferred_decoding_colorspace.side_effect = query
+    native_spy.heif_decode_image.side_effect = decode
+    image = reader.open(Path(respath('test2.heic')).read_bytes())
+    assert image.load() is image
+    assert image.data is not None
+    assert observed == [expected]
+    native_spy.heif_image_handle_release.assert_called_once()
+
+
 def test_pixel_buffer_survives_reader_and_crop_collection():
     image = reader.open(Path(respath('test2.heic')).read_bytes(),
                         apply_transformations=False).load()

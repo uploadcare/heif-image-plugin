@@ -150,6 +150,8 @@ pip install --no-build-isolation .
   threshold. Setting it to `None` disables the native pixel and memory limits.
 * Changed default chroma downsampling from `average` to `best`: uses `sharp-yuv`
   when possible, and `average` otherwise.
+* Enabled bilinear chroma upsampling during decoding for 4:2:2 with libheif
+  1.19.0+ and for 4:2:0 with libheif 1.23.6+.
 * Added saving of palette images (`P` and `PA` modes), including transparency.
 * Grayscale images with alpha (`LA` mode) are now encoded directly, without
   converting to RGBA on older libheif versions.
