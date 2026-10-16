@@ -1,16 +1,15 @@
 # heif-image-plugin
 
-[![Runtime](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Runtime.yml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Runtime.yml)
-[![Python](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yml)
+[![Linux](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Linux.yaml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Linux.yaml)
+[![macOS](https://github.com/uploadcare/heif-image-plugin/actions/workflows/MacOS.yaml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/MacOS.yaml)
+[![Python](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yaml/badge.svg)](https://github.com/uploadcare/heif-image-plugin/actions/workflows/Python.yaml)
 [![coverage](https://img.shields.io/codecov/c/gh/uploadcare/heif-image-plugin)](https://app.codecov.io/gh/uploadcare/heif-image-plugin)
 [![Py Versions](https://img.shields.io/pypi/pyversions/heif-image-plugin)](https://pypi.org/project/heif-image-plugin/)
 [![license](https://img.shields.io/github/license/uploadcare/heif-image-plugin)](https://github.com/uploadcare/heif-image-plugin/blob/main/LICENSE)
 
 A HEIF/HEIC and AVIF plugin for [Pillow](https://pillow.readthedocs.io/)
-based on the [pyheif](https://github.com/carsales/pyheif) library.
+based on [libheif](https://github.com/strukturag/libheif).
 
-Originally based on the [pyheif-pillow-opener](https://github.com/ciotto/pyheif-pillow-opener)
-code from Christian Bianciotto.
 
 ## Installation
 
@@ -18,19 +17,51 @@ You can install **heif-image-plugin** from *PyPI*:
 
 `pip install heif-image-plugin`
 
-### Install libheif binaries for saving capabilities
+### Bundled libheif and codecs
+
+```bash
+pip install 'heif-image-plugin[libheif]'
+```
+
+The `[libheif]` extra installs the `libheif-binary` package, which provides libheif
+and codecs. The plugin uses this package when installed; otherwise, it requires
+system libheif.
+
+### Ubuntu system libheif
 
 Ubuntu 24.04:
 
 ```bash
 apt-get install --no-install-recommends \
-    libheif-examples \
+    libheif1 \
     libheif-plugin-libde265 \
     libheif-plugin-x265 \
     libheif-plugin-aomenc
 ```
 
 Minimal supported libheif version is 1.17.x.
+
+### macOS with Homebrew
+
+The macOS wheel expects `@rpath/libheif.1.dylib`, while Homebrew's libheif uses
+an absolute install name. Build the extension against Homebrew's library so it
+records the correct path.
+
+With a C compiler and Python development headers available, run the following
+from the repository root in a Python environment without `libheif-binary`:
+
+```bash
+brew install libheif
+pip install 'setuptools>=77.0.3' 'cffi>=1.15.1'
+pip install --no-build-isolation .
+```
+
+`--no-build-isolation` prevents pip from installing `libheif-binary`
+as a build dependency.
+On macOS, the build automatically detects Homebrew's libheif when `brew` is
+on `PATH` and `libheif-binary` is absent. If Homebrew's libheif is not installed,
+the build uses the standard system library search.
+
 
 ## How to use
 
@@ -42,9 +73,15 @@ import HeifImagePlugin
 
 image = Image.open('test.heic')
 ImageOps.exif_transpose(image, in_place=True)
-# requires `heif-enc` binary with installed codecs or plugins
+# requires libheif with a HEVC or AV1 encoder
 image.save('test.avif')
 ```
+
+Decoding errors are exposed as `HeifImagePlugin.HeifError`, with `code`,
+`subcode` and `message` fields.
+
+Downsampling defaults to `'best'`, which selects `'sharp-yuv'` for RGB/RGBA images
+with 4:2:0 subsampling when supported, and `'average'` otherwise.
 
 Encoder-specific parameters can be passed when saving:
 
@@ -67,6 +104,7 @@ subsampling; omit `subsampling` or set it to `'420'`:
 image.save('test.avif', encoder='svt', subsampling='420')
 ```
 
+
 ## How to contribute
 
 Contributions are welcome:
@@ -76,10 +114,46 @@ Contributions are welcome:
 3. Start a development shell: `make docker_shell`.
 4. Make your changes and add tests.
 5. Run `make lint` and `make test` inside the container.
-6. Commit your changes on a new branch and open a pull request.
+6. Commit your changes on a new branch and open a pull request against
+   [uploadcare/heif-image-plugin](https://github.com/uploadcare/heif-image-plugin).
+
+### Building from source
+
+Building from source requires a C compiler and Python development headers.
+On Linux and macOS, a normal `pip install .` automatically installs libheif
+headers and libraries in an isolated build environment. Install runtime libheif
+separately, using the `[libheif]` extra or system packages described above.
+
+To build against system libheif without `libheif-binary`, install libheif
+development headers and its library, plus setuptools and CFFI, then run:
+
+```bash
+pip install --no-build-isolation .
+```
 
 
 ## Changelog
+
+### 0.9.0
+
+* Reading and saving now use libheif directly. The `pyheif` dependency is removed.
+  The `heif-enc` executable and `HEIF_ENC_BIN` setting are no longer used.
+  Saving no longer uses temporary files or subprocesses.
+* Added the `[libheif]` installation extra, which installs `libheif-binary`.
+  Without this extra, system libheif 1.17 or later is required.
+* Wheels for CPython 3.9+ are provided for Linux (glibc 2.28+ and musl 1.2+, on
+  x86_64 and ARM64) and macOS 11+ (universal2).
+  Other platforms require a source build, as does using libheif from Homebrew.
+* Decoding errors now use `HeifImagePlugin.HeifError` instead of
+  `pyheif.error.HeifError`.
+* Native decoding limits now follow Pillow's `Image.MAX_IMAGE_PIXELS` error
+  threshold. Setting it to `None` disables the native pixel and memory limits.
+* Changed default chroma downsampling from `average` to `best`: uses `sharp-yuv`
+  when possible, and `average` otherwise.
+* Added saving of palette images (`P` and `PA` modes), including transparency.
+* Grayscale images with alpha (`LA` mode) are now encoded directly, without
+  converting to RGBA on older libheif versions.
+* Saving now preserves the displayed EXIF orientation across supported libheif versions.
 
 ### 0.8.1
 
@@ -158,3 +232,9 @@ target in the `Makefile` to install it.
 * Fill `info['icc_profile']` on loading.
 * Close and release file pointer after loading.
 * Decoding without custom HeifDecoder(ImageFile.PyDecoder).
+
+
+## Acknowledgments
+
+This project started with Christian Bianciotto’s
+[pyheif-pillow-opener](https://github.com/ciotto/pyheif-pillow-opener).

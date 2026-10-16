@@ -3,10 +3,11 @@ from io import BytesIO
 from unittest import mock
 
 import pytest
-from PIL import Image, ImageCms, ImageOps
-from pyheif.error import HeifError
-from pyheif.transformations import Transformations
+from PIL import Image, ImageCms, ImageFile, ImageOps
 
+from _heif_image_plugin import reader
+from _heif_image_plugin.errors import HeifError
+from _heif_image_plugin.transformations import Transformations
 from HeifImagePlugin import check_heif_magic
 
 from . import avg_diff, respath
@@ -58,14 +59,15 @@ def test_image_color_profile():
     icc_profile = ImageCms.getOpenProfile(icc_profile)
 
 
-@mock.patch('pyheif.open', side_effect=HeifError(code=1, subcode=2, message='Error'))
+@mock.patch('_heif_image_plugin.reader.open',
+            side_effect=HeifError(code=1, subcode=2, message='Error'))
 def test_open_image_error(open_mock):
     with pytest.raises(IOError):
         Image.open(respath('test1.heic'))
 
 
-@mock.patch('pyheif.open')
-def test_open_image_metadata(open_mock):
+@mock.patch('_heif_image_plugin.reader.open')
+def test_open_image_ignores_unknown_metadata(open_mock):
     m = mock.MagicMock()
     m.size = (10, 20)
     m.mode = 'RGB'
@@ -75,12 +77,31 @@ def test_open_image_metadata(open_mock):
         {'type': 'foo', 'data': 'bar'},
         {'type': 'bar', 'data': 'foo'},
     ]
+    m.exif = None
+    m.color_profile = None
     open_mock.return_value = m
 
     image = Image.open(respath('test1.heic'))
 
-    assert open_mock.called
-    assert image is not None
+    assert image.size == (10, 20)
+    assert image.mode == 'RGB'
+    assert 'exif' not in image.info
+    assert 'icc_profile' not in image.info
+
+
+@mock.patch.object(reader.HeifImage, 'set_max_pixels', autospec=True)
+@pytest.mark.parametrize('max_pixels', [1_000_000, None])
+def test_open_image_applies_pillow_error_threshold(
+    set_max_pixels, monkeypatch, max_pixels
+):
+    monkeypatch.setattr(Image, 'MAX_IMAGE_PIXELS', max_pixels)
+    image = Image.open(respath('test2.heic'))
+    try:
+        set_max_pixels.assert_called_once_with(
+            image.heif_file, None if max_pixels is None else 2 * max_pixels)
+    finally:
+        image.heif_file.close()
+        image.close()
 
 
 @pytest.mark.parametrize(
@@ -125,15 +146,18 @@ def test_orientation(orientation, orientation_ref_image):
     assert max(avg_diffs) <= 0.02
 
 
-def test_not_load_truncated():
+def test_not_load_truncated(monkeypatch):
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', False)
     image = Image.open(respath('test-crop.heic'))
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', True)
     with pytest.raises(HeifError):
         image.load()
 
 
 @mock.patch('PIL.ImageFile.LOAD_TRUNCATED_IMAGES', True)
-def test_load_truncated():
+def test_load_truncated(monkeypatch):
     image = Image.open(respath('test-crop.heic'))
+    monkeypatch.setattr(ImageFile, 'LOAD_TRUNCATED_IMAGES', False)
     image.load()
 
 

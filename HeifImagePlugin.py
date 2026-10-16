@@ -1,125 +1,16 @@
-import subprocess
-import tempfile
-from copy import copy
-from dataclasses import dataclass
-from weakref import WeakKeyDictionary
+from __future__ import annotations
 
-import piexif
-import pyheif
-from cffi import FFI
-from PIL import Image, ImageFile
-from pyheif import reader as pyheif_reader
-from pyheif.error import HeifError
+from functools import lru_cache
+from io import BytesIO
 
+from PIL import ExifTags, Image, ImageFile, ImageOps
 
-class _LibheifProxy:
-    def heif_decoding_options_alloc(self):
-        options = _native_libheif.heif_decoding_options_alloc()
-        if hasattr(options, 'strict_decoding'):
-            options.strict_decoding = int(not ImageFile.LOAD_TRUNCATED_IMAGES)
-        return options
-
-    def __getattr__(self, name):
-        return getattr(_native_libheif, name)
-
-
-_native_libheif = pyheif_reader.libheif
-pyheif_reader.libheif = _LibheifProxy()
-
-
-@dataclass
-class LibheifError:
-    code: int
-    subcode: int
-
-    def __eq__(self, e):
-        if not isinstance(e, HeifError):  # pragma: no cover
-            return False
-        return e.code == self.code and e.subcode == self.subcode
-
-
-class Errors:
-    end_of_file = LibheifError(7, 100)
-    unsupported_color_conversion = LibheifError(4, 3003)
-
-
-ffi = FFI()
-_keep_refs = WeakKeyDictionary()
-HEIF_ENC_BIN = 'heif-enc'
-
-
-def _crop_heif_file(heif):
-    # Zero-copy crop before loading. Just shifts data pointer and updates meta.
-    crop = heif.transformations.crop
-    if crop == (0, 0) + heif.size:
-        return heif
-
-    if heif.mode not in ("L", "RGB", "RGBA"):  # pragma: no cover
-        raise ValueError("Unknown mode")
-    pixel_size = len(heif.mode)
-
-    offset = heif.stride * crop[1] + pixel_size * crop[0]
-    cdata = ffi.from_buffer(heif.data, require_writable=False) + offset
-    data = ffi.buffer(cdata, heif.stride * crop[3])
-
-    # Keep reference to the original data as long as "cdata + offset" is alive.
-    # Normally ffi.from_buffer should hold it for us but unfortunately
-    # cdata + offset creates a new cdata object without reference.
-    _keep_refs[cdata] = heif.data
-
-    new_heif = copy(heif)
-    new_heif.size = crop[2:4]
-    new_heif.transformations = copy(heif.transformations)
-    new_heif.transformations.crop = (0, 0) + crop[2:4]
-    new_heif.data = data
-    return new_heif
-
-
-def _rotate_heif_file(heif):
-    """
-    Heif files already contain transformation chunks imir and irot which are
-    dominate over Orientation tag in EXIF.
-
-    This is not aligned with other formats behavior and we MUST fix EXIF after
-    loading to prevent unexpected rotation after re-saving in other formats.
-
-    And we come up to there is no reasons to force rotation of HEIF images
-    after loading since we need update EXIF anyway.
-    """
-    orientation = heif.transformations.orientation_tag
-    if not (1 <= orientation <= 8):
-        return heif
-
-    exif = {'0th': {piexif.ImageIFD.Orientation: orientation}}
-    if heif.exif:
-        try:
-            exif = piexif.load(heif.exif)
-            exif['0th'][piexif.ImageIFD.Orientation] = orientation
-        except Exception:
-            pass
-
-    new_heif = copy(heif)
-    new_heif.transformations = copy(heif.transformations)
-    new_heif.transformations.orientation_tag = 0
-    new_heif.exif = piexif.dump(exif)
-    return new_heif
-
-
-def _extract_heif_exif(heif_file):
-    """
-    Unlike other helper functions, this alters heif_file in-place.
-    """
-    heif_file.exif = None
-
-    clean_metadata = []
-    for item in heif_file.metadata or []:
-        if item['type'] == 'Exif':
-            if heif_file.exif is None:
-                if item['data'] and item['data'][0:4] == b"Exif":
-                    heif_file.exif = item['data']
-        else:
-            clean_metadata.append(item)
-    heif_file.metadata = clean_metadata
+from _heif_image_plugin import reader, writer
+from _heif_image_plugin._native import libheif_version
+from _heif_image_plugin.errors import Errors, HeifError, LibheifError  # noqa: F401
+from _heif_image_plugin.metadata import (
+    extract_heif_exif as _extract_heif_exif, rotate_heif_file as _rotate_heif_file)
+from _heif_image_plugin.transformations import crop_heif_file as _crop_heif_file
 
 
 class HeifImageFile(ImageFile.ImageFile):
@@ -128,10 +19,12 @@ class HeifImageFile(ImageFile.ImageFile):
 
     def _open_heif_file(self, apply_transformations):
         try:
-            heif_file = pyheif.open(
-                self.fp, apply_transformations=apply_transformations)
+            heif_file = reader.open(
+                self.fp.read(), apply_transformations=apply_transformations)
         except HeifError as e:
             raise SyntaxError(str(e))
+        heif_file.set_max_pixels(
+            None if Image.MAX_IMAGE_PIXELS is None else 2 * Image.MAX_IMAGE_PIXELS)
 
         _extract_heif_exif(heif_file)
 
@@ -169,6 +62,7 @@ class HeifImageFile(ImageFile.ImageFile):
 
     def _open(self):
         self.tile = []
+        self._load_truncated_images = ImageFile.LOAD_TRUNCATED_IMAGES
         self.heif_file = self._open_heif_file(False)
 
     def load(self):
@@ -176,18 +70,20 @@ class HeifImageFile(ImageFile.ImageFile):
         if heif_file:
             try:
                 try:
-                    heif_file = heif_file.load()
+                    heif_file = heif_file.load(
+                        strict_decoding=not self._load_truncated_images)
                 except HeifError as e:
                     if e != Errors.unsupported_color_conversion:
                         raise
                     # Unsupported feature: Unsupported color conversion
                     # https://github.com/strukturag/libheif/issues/1273
                     self.fp.seek(0)
-                    heif_file = self._open_heif_file(True).load()
+                    heif_file = self._open_heif_file(True).load(
+                        strict_decoding=not self._load_truncated_images)
             except HeifError as e:
                 # Ignore EOF error and return blank image otherwise
                 cropped_file = e == Errors.end_of_file
-                if not cropped_file or not ImageFile.LOAD_TRUNCATED_IMAGES:
+                if not cropped_file or not self._load_truncated_images:
                     raise
 
             self.load_prepare()
@@ -202,95 +98,121 @@ class HeifImageFile(ImageFile.ImageFile):
 
 
 def check_heif_magic(data):
-    return pyheif.check(data) != pyheif.heif_filetype_no
+    return reader.check(data)
 
 
-is_buggy_la_mode = '1.17.0' <= pyheif.libheif_version() <= '1.18.2'
+is_buggy_orientation_save = libheif_version < (1, 19, 8)
 
 
-def _save(im, fp, filename):
-    # Save it before subsequent im.save() call
+@lru_cache()
+def _supports_sharp_yuv(avif: bool, encoder: str | None) -> bool:
+    try:
+        writer.write(
+            BytesIO(), bytes(8 * 8 * 3), (8, 8), channels=3,
+            avif=avif, encoder=encoder, quality=50, downsampling='sharp-yuv',
+            encoder_params={} if encoder == 'svt' else {'chroma': '420'})
+    except HeifError as error:
+        if error == Errors.unsupported_color_conversion:
+            return False
+        raise OSError(str(error)) from error
+    return True
+
+
+def _save(im: Image.Image, fp: writer.Output, filename: str) -> None:
     info = im.encoderinfo
 
     if im.mode in ('P', 'PA'):
-        # disbled due to errors in libheif encoder
-        raise IOError("cannot write mode P as HEIF")
+        transparent = (im.mode == 'PA' or 'transparency' in im.info
+                       or (im.palette is not None and im.palette.mode == 'RGBA'))
+        im = im.convert('RGBA' if transparent else 'RGB')
 
-    if im.mode == '1':
-        # to circumvent `heif-enc` bug
+    if im.mode in ('1', 'I', 'I;16', 'I;16B'):
         im = im.convert('L')
 
-    if im.mode == 'LA' and is_buggy_la_mode:
-        im = im.convert('RGBA')
+    if im.mode not in ('RGB', 'RGBA', 'L', 'LA'):
+        raise OSError(f'cannot write mode {im.mode} as HEIF')
 
-    with tempfile.NamedTemporaryFile(suffix='.png') as tmpfile:
-        im.save(
-            tmpfile, format='PNG', optimize=False, compress_level=0,
-            icc_profile=info.get('icc_profile', im.info.get('icc_profile')),
-            exif=info.get('exif', im.info.get('exif'))
-        )
+    avif = info.get('avif')
+    if avif is None and filename:
+        ext = filename.rpartition('.')[2].lower()
+        avif = ext == 'avif'
 
-        cmd = [HEIF_ENC_BIN, '-o', '/dev/stdout', tmpfile.name]
+    encoder = str(info['encoder']) if info.get('encoder') else None
+    is_svt = info.get('encoder') == 'svt'
 
-        avif = info.get('avif')
-        if avif is None and filename:
-            ext = filename.rpartition('.')[2].lower()
-            avif = ext == 'avif'
-        if avif:
-            cmd.append('-A')
+    subsampling = info.get('subsampling')
+    if subsampling is None:
+        subsampling = '420'
+    if subsampling == 0:
+        subsampling = '444'
+    elif subsampling == 1:
+        subsampling = '422'
+    elif subsampling == 2:
+        subsampling = '420'
 
-        if info.get('encoder'):
-            cmd.extend(['-e', str(info['encoder'])])
+    native_params: dict[str, str] = {}
+    if is_svt:
+        if subsampling != '420':
+            raise ValueError('SVT encoder supports only subsampling=420')
+    else:
+        native_params['chroma'] = str(subsampling)
 
-        if info.get('quality') is not None:
-            cmd.extend(['-q', str(info['quality'])])
+    if avif and info.get('concurrency') is not None:
+        native_params['threads'] = str(info['concurrency'])
 
-        cmd.extend(['-C', str(info.get('downsampling') or 'average')])
+    params = dict(info.get('encoder_params') or {})
+    if is_svt and 'chroma' in params:
+        raise ValueError('SVT encoder does not support chroma parameter')
+    if (speed := info.get('speed')) is not None:
+        params.setdefault('speed', speed)
+    for k, v in params.items():
+        native_params[str(k)] = str(v)
 
-        is_svt = info.get('encoder') == 'svt'
-        subsampling = info.get('subsampling')
-        if subsampling is None:
-            subsampling = '420'
-        if subsampling == 0:
-            subsampling = '444'
-        elif subsampling == 1:
-            subsampling = '422'
-        elif subsampling == 2:
-            subsampling = '420'
-        if is_svt:
-            if subsampling != '420':
-                raise ValueError('SVT encoder supports only subsampling=420')
-        else:
-            cmd.extend(['-p', f'chroma={subsampling}'])
+    downsampling = str(info.get('downsampling') or 'best')
+    if downsampling == 'best':
+        chroma = native_params.get('chroma', '420')
+        downsampling = 'average'
+        if (im.mode in ('RGB', 'RGBA') and chroma == '420'
+                and _supports_sharp_yuv(bool(avif), encoder)):
+            downsampling = 'sharp-yuv'
+    if downsampling not in ('nn', 'nearest-neighbor', 'average', 'sharp-yuv'):
+        raise OSError('Undefined chroma downsampling algorithm.')
 
-        if avif and info.get('concurrency') is not None:
-            cmd.extend(['-p', f"threads={info['concurrency']}"])
+    quality = info.get('quality')
+    try:
+        quality = 50 if quality is None else int(quality)
+        if not 0 <= quality <= 100:
+            raise ValueError('Must be between 0 and 100.')
+    except (TypeError, ValueError, OverflowError) as error:
+        raise OSError('Invalid quality factor.') from error
 
-        params = dict(info.get('encoder_params') or {})
-        if is_svt and 'chroma' in params:
-            raise ValueError('SVT encoder does not support chroma parameter')
-        if (speed := info.get('speed')) is not None:
-            params.setdefault('speed', speed)
-        for k, v in params.items():
-            cmd.extend(['-p', f'{k}={v}'])
+    icc = info.get('icc_profile', im.info.get('icc_profile'))
+    exif = info.get('exif', im.info.get('exif'))
+    orientation = 1
+    if exif:
+        metadata = Image.Exif()
+        metadata.load(exif.tobytes() if isinstance(exif, Image.Exif) else exif)
+        value = metadata.get(ExifTags.Base.Orientation, 1)
+        if value in range(1, 9):
+            orientation = value
+        if is_buggy_orientation_save and orientation != 1:
+            # Older libheif writes unreliable orientation properties.
+            im = im.copy()
+            im.info['exif'] = metadata.tobytes()
+            im = ImageOps.exif_transpose(im)
+            orientation = 1
+        if ExifTags.Base.Orientation in metadata:
+            del metadata[ExifTags.Base.Orientation]
+        exif = metadata.tobytes()
 
-        try:
-            with tempfile.TemporaryFile() as stderr:
-                with subprocess.Popen(
-                    cmd, stdout=subprocess.PIPE, stderr=stderr
-                ) as enc:
-                    for data in iter(lambda: enc.stdout.read(128 * 1024), b''):
-                        fp.write(data)
-                    if enc.wait():
-                        stderr.seek(0)
-                        message = stderr.read().decode(errors='replace').strip()
-                        if not message:
-                            message = f'heif-enc exited with code {enc.returncode}'
-                        raise OSError(message)
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                2, f"Can't find heif encoding binary. Install '{HEIF_ENC_BIN}' "
-                + "or set `HeifImagePlugin.HEIF_ENC_BIN` to full path.")
+    try:
+        writer.write(
+            fp, im.tobytes(), im.size, channels=len(im.getbands()), avif=bool(avif),
+            encoder=encoder, quality=quality, downsampling=downsampling,
+            encoder_params=native_params, icc_profile=icc, exif=exif,
+            orientation=orientation)
+    except HeifError as error:
+        raise OSError(str(error)) from error
 
 
 Image.register_open(HeifImageFile.format, HeifImageFile, check_heif_magic)

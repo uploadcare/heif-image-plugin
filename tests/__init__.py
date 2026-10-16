@@ -4,7 +4,7 @@ from PIL import ImageChops
 
 
 def respath(*path):
-    return os.path.join('tests', 'images', *path)
+    return os.path.join(os.path.dirname(__file__), 'images', *path)
 
 
 def avg_diff(im1, im2, *, threshold=0):
