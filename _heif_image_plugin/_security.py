@@ -50,10 +50,14 @@ except AttributeError:
     get_context_limits = None
 
 
-def set_max_pixels(context, max_pixels):
+def set_max_pixels(context, max_pixels, *, max_metadata_bytes=None):
     max_pixels = 0 if max_pixels is None else index(max_pixels)
     if max_pixels < 0:
         raise ValueError('max_pixels must be nonnegative')
+    if max_metadata_bytes is not None:
+        max_metadata_bytes = index(max_metadata_bytes)
+        if max_metadata_bytes < 0:
+            raise ValueError('max_metadata_bytes must be nonnegative')
 
     if get_context_limits is None:
         maximum_int = (1 << (native_ffi.sizeof('int') * 8 - 1)) - 1
@@ -65,8 +69,11 @@ def set_max_pixels(context, max_pixels):
     context = ffi.cast('struct heif_context*',
                        int(native_ffi.cast('uintptr_t', context)))
     limits = get_context_limits(context)
+    max_memory = max_pixels * 4 if max_metadata_bytes is None else max_metadata_bytes
     if limits.version >= 1:
         limits.max_image_size_pixels = max_pixels
-        limits.max_memory_block_size = max_pixels * 4
+        limits.max_memory_block_size = max_memory
+        if max_metadata_bytes is not None:
+            limits.max_color_profile_size = max_metadata_bytes
     if limits.version >= 2:
-        limits.max_total_memory = max_pixels * 4
+        limits.max_total_memory = max_memory

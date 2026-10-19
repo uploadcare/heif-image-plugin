@@ -95,13 +95,18 @@ class HeifImage:
         self._context = None
 
 
-def open(data: bytes, *, apply_transformations: bool = True) -> HeifImage:
+def open(data: bytes, *, apply_transformations: bool = True,
+         max_pixels: int | None = None,
+         max_metadata_bytes: int | None = None) -> HeifImage:
     buffer = ffi.from_buffer(data)
     context = ffi.gc(lib.heif_context_alloc(),
                      _keep_alive(lib.heif_context_free, buffer), size=len(data))
     out = ffi.new('struct heif_image_handle **')
     handle = None
     try:
+        if max_pixels is not None or max_metadata_bytes is not None:
+            _security.set_max_pixels(
+                context, max_pixels, max_metadata_bytes=max_metadata_bytes)
         assert_success(lib.heif_context_read_from_memory_without_copy(
             context, buffer, len(data), ffi.NULL,
         ))

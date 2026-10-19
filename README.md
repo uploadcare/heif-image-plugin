@@ -80,6 +80,20 @@ image.save('test.avif')
 Decoding errors are exposed as `HeifImagePlugin.HeifError`, with `code`,
 `subcode` and `message` fields.
 
+Pillow's `Image.MAX_IMAGE_PIXELS` error threshold is applied before opening.
+`HeifImagePlugin.MAX_METADATA_BYTES` defaults to `50 * 1024 * 1024` (50 MiB)
+and sets libheif's opening-time block, tracked-total, and per-ICC-profile limits.
+This budget covers metadata and tracked internal structures; it is not a strict
+combined metadata or process-memory ceiling, and excludes input-file buffering.
+Set the constant before opening an image to change the budget; `0` disables it.
+These memory and profile limits require libheif 1.19+, with tracked-total limits
+requiring 1.20+. Older supported versions apply only the pixel limit.
+
+After opening, decoding block and tracked-total limits return to four bytes per
+allowed pixel, so decoded images can exceed the opening budget. Setting
+`Image.MAX_IMAGE_PIXELS = None` disables native pixel and decoding memory limits;
+the opening budget and ICC-profile cap still apply.
+
 Downsampling defaults to `'best'`, which selects `'sharp-yuv'` for RGB/RGBA images
 with 4:2:0 subsampling when supported, and `'average'` otherwise.
 
@@ -146,8 +160,10 @@ pip install --no-build-isolation .
   Other platforms require a source build, as does using libheif from Homebrew.
 * Decoding errors now use `HeifImagePlugin.HeifError` instead of
   `pyheif.error.HeifError`.
-* Native decoding limits now follow Pillow's `Image.MAX_IMAGE_PIXELS` error
-  threshold. Setting it to `None` disables the native pixel and memory limits.
+* Native pixel limits now follow Pillow's `Image.MAX_IMAGE_PIXELS` error threshold
+  before opening and during decoding. Added `MAX_METADATA_BYTES` for a separate
+  50 MiB opening budget. Setting `Image.MAX_IMAGE_PIXELS` to `None` disables native
+  pixel and decoding memory limits while retaining the opening budget.
 * Changed default chroma downsampling from `average` to `best`: uses `sharp-yuv`
   when possible, and `average` otherwise.
 * Added saving of palette images (`P` and `PA` modes), including transparency.

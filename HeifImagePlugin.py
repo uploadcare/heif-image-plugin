@@ -13,18 +13,23 @@ from _heif_image_plugin.metadata import (
 from _heif_image_plugin.transformations import crop_heif_file as _crop_heif_file
 
 
+MAX_METADATA_BYTES = 50 * 1024 * 1024
+
+
 class HeifImageFile(ImageFile.ImageFile):
     format = 'HEIF'
     format_description = "HEIF/HEIC image"
 
     def _open_heif_file(self, apply_transformations):
+        max_pixels = (None if Image.MAX_IMAGE_PIXELS is None
+                      else 2 * Image.MAX_IMAGE_PIXELS)
         try:
             heif_file = reader.open(
-                self.fp.read(), apply_transformations=apply_transformations)
+                self.fp.read(), apply_transformations=apply_transformations,
+                max_pixels=max_pixels, max_metadata_bytes=MAX_METADATA_BYTES)
         except HeifError as e:
             raise SyntaxError(str(e))
-        heif_file.set_max_pixels(
-            None if Image.MAX_IMAGE_PIXELS is None else 2 * Image.MAX_IMAGE_PIXELS)
+        heif_file.set_max_pixels(max_pixels)
 
         _extract_heif_exif(heif_file)
 
