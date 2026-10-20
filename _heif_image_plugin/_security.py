@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from math import isqrt
 from operator import index
 
@@ -45,28 +46,63 @@ ffi.cdef("""
 """)
 lib = ffi.dlopen(_libheif.__file__)
 try:
-    get_context_limits = lib.heif_context_get_security_limits
+    _get_context_limits = lib.heif_context_get_security_limits
 except AttributeError:
-    get_context_limits = None
+    _get_context_limits = None
 
 
-def set_max_pixels(context, max_pixels):
-    max_pixels = 0 if max_pixels is None else index(max_pixels)
-    if max_pixels < 0:
-        raise ValueError('max_pixels must be nonnegative')
+@contextmanager
+def opening_limits(context, max_pixels=None, max_metadata_bytes=None):
+    """Apply pixel limits and a temporary opening memory budget.
 
-    if get_context_limits is None:
-        maximum_int = (1 << (native_ffi.sizeof('int') * 8 - 1)) - 1
-        maximum_width = isqrt(max_pixels - 1) + 1 if max_pixels else maximum_int
-        native_lib.heif_context_set_maximum_image_size_limit(
-            context, min(maximum_width, maximum_int))
+    None preserves native defaults; zero disables a limit. Explicit pixel
+    limits set decoding memory to four bytes per pixel. The metadata budget
+    temporarily replaces memory limits and sets a persistent ICC-profile cap.
+    """
+    if max_pixels is not None:
+        max_pixels = index(max_pixels)
+        if max_pixels < 0:
+            raise ValueError('max_pixels must be nonnegative')
+    if max_metadata_bytes is not None:
+        max_metadata_bytes = index(max_metadata_bytes)
+        if max_metadata_bytes < 0:
+            raise ValueError('max_metadata_bytes must be nonnegative')
+
+    if max_pixels is None and max_metadata_bytes is None:
+        yield
+        return
+
+    if _get_context_limits is None:
+        if max_pixels is not None:
+            maximum_int = (1 << (native_ffi.sizeof('int') * 8 - 1)) - 1
+            maximum_width = isqrt(max_pixels - 1) + 1 if max_pixels else maximum_int
+            native_lib.heif_context_set_maximum_image_size_limit(
+                context, min(maximum_width, maximum_int))
+        yield
         return
 
     context = ffi.cast('struct heif_context*',
                        int(native_ffi.cast('uintptr_t', context)))
-    limits = get_context_limits(context)
-    if limits.version >= 1:
+    limits = _get_context_limits(context)
+    if max_pixels is not None:
         limits.max_image_size_pixels = max_pixels
         limits.max_memory_block_size = max_pixels * 4
-    if limits.version >= 2:
-        limits.max_total_memory = max_pixels * 4
+        if limits.version >= 2:
+            limits.max_total_memory = max_pixels * 4
+
+    if max_metadata_bytes is None:
+        yield
+
+    else:
+        max_memory_block_size = limits.max_memory_block_size
+        limits.max_memory_block_size = max_metadata_bytes
+        limits.max_color_profile_size = max_metadata_bytes
+        if limits.version >= 2:
+            max_total_memory = limits.max_total_memory
+            limits.max_total_memory = max_metadata_bytes
+        try:
+            yield
+        finally:
+            limits.max_memory_block_size = max_memory_block_size
+            if limits.version >= 2:
+                limits.max_total_memory = max_total_memory

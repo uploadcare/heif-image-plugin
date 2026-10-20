@@ -80,6 +80,19 @@ image.save('test.avif')
 Decoding errors are exposed as `HeifImagePlugin.HeifError`, with `code`,
 `subcode` and `message` fields.
 
+The plugin follows Pillow's `Image.MAX_IMAGE_PIXELS` error threshold. Set it to
+`None` to disable pixel and decoding memory limits; `0` rejects nonempty images.
+
+`HeifImagePlugin.MAX_METADATA_BYTES` defaults to 50 MiB and limits opening memory
+and individual ICC profiles, not total process memory. Set it before opening an
+image; `None` disables it, while `0` is clamped to one byte. These limits require
+libheif 1.19+. Decoded pixels can exceed this opening budget.
+
+For direct use of `_heif_image_plugin.reader.open()`, `max_pixels` sets the pixel
+cap and a decoding memory budget of four bytes per pixel; `max_metadata_bytes`
+sets the opening memory budget and ICC-profile cap. Each argument defaults to
+`None` (preserve native defaults); `0` disables its limits independently.
+
 Downsampling defaults to `'best'`, which selects `'sharp-yuv'` for RGB/RGBA images
 with 4:2:0 subsampling when supported, and `'average'` otherwise.
 
@@ -146,8 +159,8 @@ pip install --no-build-isolation .
   Other platforms require a source build, as does using libheif from Homebrew.
 * Decoding errors now use `HeifImagePlugin.HeifError` instead of
   `pyheif.error.HeifError`.
-* Native decoding limits now follow Pillow's `Image.MAX_IMAGE_PIXELS` error
-  threshold. Setting it to `None` disables the native pixel and memory limits.
+* Applied Pillow's pixel error threshold to native opening and decoding limits.
+  Added `MAX_METADATA_BYTES` with a default opening memory budget of 50 MiB.
 * Changed default chroma downsampling from `average` to `best`: uses `sharp-yuv`
   when possible, and `average` otherwise.
 * Added saving of palette images (`P` and `PA` modes), including transparency.

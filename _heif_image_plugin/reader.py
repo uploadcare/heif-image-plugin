@@ -41,11 +41,6 @@ class HeifImage:
         self.data = None
         self.stride = None
 
-    def set_max_pixels(self, max_pixels: int | None) -> None:
-        if self._context is None:
-            raise ValueError('Cannot set max_pixels after loading or closing')
-        _security.set_max_pixels(self._context, max_pixels)
-
     def load(self, *, strict_decoding: bool = True) -> 'HeifImage':
         if self._handle is None:
             return self
@@ -95,19 +90,34 @@ class HeifImage:
         self._context = None
 
 
-def open(data: bytes, *, apply_transformations: bool = True) -> HeifImage:
+def open(data: bytes, *, apply_transformations: bool = True,
+         max_pixels: int | None = None,
+         max_metadata_bytes: int | None = None) -> HeifImage:
+    """Open an image without decoding its pixels.
+
+    max_pixels: Pixel cap and decoding memory budget of four bytes per pixel.
+        None preserves native defaults; 0 disables these limits.
+    max_metadata_bytes: Opening block/total memory and ICC-profile cap in bytes.
+        0 disables these caps; None preserves the native ICC-profile cap and
+        uses the pixel-derived memory budget only if max_pixels is explicit.
+        After metadata extraction, block/total memory limits return to native
+        defaults or the explicit pixel-derived budget. The ICC cap remains.
+    """
     buffer = ffi.from_buffer(data)
     context = ffi.gc(lib.heif_context_alloc(),
                      _keep_alive(lib.heif_context_free, buffer), size=len(data))
     out = ffi.new('struct heif_image_handle **')
     handle = None
     try:
-        assert_success(lib.heif_context_read_from_memory_without_copy(
-            context, buffer, len(data), ffi.NULL,
-        ))
-        assert_success(lib.heif_context_get_primary_image_handle(context, out))
-        handle = ffi.gc(out[0], _keep_alive(lib.heif_image_handle_release, context))
-        return HeifImage(context, handle, apply_transformations=apply_transformations)
+        with _security.opening_limits(context, max_pixels, max_metadata_bytes):
+            assert_success(lib.heif_context_read_from_memory_without_copy(
+                context, buffer, len(data), ffi.NULL,
+            ))
+            assert_success(lib.heif_context_get_primary_image_handle(context, out))
+            handle = ffi.gc(out[0], _keep_alive(lib.heif_image_handle_release, context))
+            image = HeifImage(context, handle,
+                              apply_transformations=apply_transformations)
+        return image
     except Exception:
         if handle is not None:
             ffi.release(handle)

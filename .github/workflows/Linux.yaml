@@ -57,8 +57,8 @@ jobs:
           - { stack: bundled, libheif: '1.21.*' }
           - { stack: bundled, libheif: '1.22.*' }
           - { stack: bundled, libheif: '1.23.*' }
-          - { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc' }
-          - { stack: ucare, libheif: '1.23.6-f81f28a-8543bdc', pillow: prod }
+          - { stack: ucare, libheif: '1.23.6-4cb45de-4b4baf2' }
+          - { stack: ucare, libheif: '1.23.6-4cb45de-4b4baf2', pillow: prod }
         exclude:
           - platform: { arch: aarch64 }
             runtime: { pillow: prod }
