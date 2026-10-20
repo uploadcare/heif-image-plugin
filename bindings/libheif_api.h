@@ -16,10 +16,13 @@ struct heif_error {
 };
 
 enum heif_filetype_result { heif_filetype_no, ... };
-enum heif_colorspace { heif_colorspace_RGB, heif_colorspace_monochrome, ... };
+enum heif_colorspace {
+    heif_colorspace_RGB, heif_colorspace_monochrome, heif_colorspace_YCbCr, ...
+};
 enum heif_chroma {
     heif_chroma_interleaved_RGB, heif_chroma_interleaved_RGBA,
-    heif_chroma_monochrome, ...
+    heif_chroma_monochrome, heif_chroma_420, heif_chroma_422, heif_chroma_444,
+    heif_chroma_undefined, ...
 };
 enum heif_channel { heif_channel_interleaved, heif_channel_Y, heif_channel_Alpha, ... };
 enum heif_color_profile_type {
@@ -35,6 +38,21 @@ enum heif_transform_mirror_direction {
     heif_transform_mirror_direction_horizontal, ...
 };
 
+enum heif_chroma_downsampling_algorithm {
+    heif_chroma_downsampling_nearest_neighbor,
+    heif_chroma_downsampling_average,
+    heif_chroma_downsampling_sharp_yuv, ...
+};
+enum heif_chroma_upsampling_algorithm {
+    heif_chroma_upsampling_nearest_neighbor, heif_chroma_upsampling_bilinear, ...
+};
+struct heif_color_conversion_options {
+    enum heif_chroma_downsampling_algorithm preferred_chroma_downsampling_algorithm;
+    enum heif_chroma_upsampling_algorithm preferred_chroma_upsampling_algorithm;
+    uint8_t only_use_preferred_chroma_algorithm;
+    ...;
+};
+
 /* libheif allocates this versioned struct. Only access the common fields;
    never allocate it or depend on its compile-time size. */
 struct heif_decoding_options {
@@ -42,6 +60,7 @@ struct heif_decoding_options {
     uint8_t ignore_transformations;
     uint8_t convert_hdr_to_8bit;
     uint8_t strict_decoding;
+    struct heif_color_conversion_options color_conversion_options;
     ...;
 };
 
@@ -63,6 +82,8 @@ int heif_image_handle_get_ispe_width(const struct heif_image_handle*);
 int heif_image_handle_get_ispe_height(const struct heif_image_handle*);
 int heif_image_handle_has_alpha_channel(const struct heif_image_handle*);
 int heif_image_handle_get_luma_bits_per_pixel(const struct heif_image_handle*);
+struct heif_error heif_image_handle_get_preferred_decoding_colorspace(
+    const struct heif_image_handle*, enum heif_colorspace*, enum heif_chroma*);
 heif_item_id heif_image_handle_get_item_id(const struct heif_image_handle*);
 int heif_item_get_transformation_properties(
     const struct heif_context*, heif_item_id, heif_property_id*, int);
@@ -102,16 +123,6 @@ struct heif_encoder;
 struct heif_encoder_descriptor;
 enum heif_compression_format { heif_compression_HEVC, heif_compression_AV1, ... };
 enum heif_orientation { heif_orientation_normal, ... };
-enum heif_chroma_downsampling_algorithm {
-    heif_chroma_downsampling_nearest_neighbor,
-    heif_chroma_downsampling_average,
-    heif_chroma_downsampling_sharp_yuv, ...
-};
-struct heif_color_conversion_options {
-    enum heif_chroma_downsampling_algorithm preferred_chroma_downsampling_algorithm;
-    uint8_t only_use_preferred_chroma_algorithm;
-    ...;
-};
 struct heif_color_profile_nclx {
     uint8_t full_range_flag;
     ...;
