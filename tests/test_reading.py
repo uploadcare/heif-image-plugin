@@ -89,19 +89,28 @@ def test_open_image_ignores_unknown_metadata(open_mock):
     assert 'icc_profile' not in image.info
 
 
-@mock.patch.object(reader.HeifImage, 'set_max_pixels', autospec=True)
+@mock.patch.object(reader, 'open', wraps=reader.open)
 @pytest.mark.parametrize('max_pixels', [1_000_000, None])
 def test_open_image_applies_pillow_error_threshold(
-    set_max_pixels, monkeypatch, max_pixels
+    open_mock, monkeypatch, max_pixels
 ):
     monkeypatch.setattr(Image, 'MAX_IMAGE_PIXELS', max_pixels)
     image = Image.open(respath('test2.heic'))
     try:
-        set_max_pixels.assert_called_once_with(
-            image.heif_file, None if max_pixels is None else 2 * max_pixels)
+        open_mock.assert_called_once()
+        assert open_mock.call_args.kwargs['max_pixels'] == (
+            0 if max_pixels is None else 2 * max_pixels)
     finally:
         image.heif_file.close()
         image.close()
+
+
+@mock.patch.object(reader, 'open', wraps=reader.open)
+def test_zero_pillow_pixel_threshold_rejects_nonempty_image(open_mock, monkeypatch):
+    monkeypatch.setattr(Image, 'MAX_IMAGE_PIXELS', 0)
+    with pytest.raises(Image.DecompressionBombError):
+        Image.open(respath('test2.heic'))
+    assert open_mock.call_args.kwargs['max_pixels'] == 2
 
 
 @pytest.mark.parametrize(

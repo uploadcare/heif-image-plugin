@@ -21,16 +21,19 @@ class HeifImageFile(ImageFile.ImageFile):
     format_description = "HEIF/HEIC image"
 
     def _open_heif_file(self, apply_transformations):
-        max_pixels = (None if Image.MAX_IMAGE_PIXELS is None
-                      else 2 * Image.MAX_IMAGE_PIXELS)
+        # Convert Pillow/plugin conventions to libheif: None disables via 0;
+        # numeric limits stay positive because libheif treats 0 as unlimited.
+        # Pillow's pixel error threshold is twice MAX_IMAGE_PIXELS.
+        max_pixels = (0 if Image.MAX_IMAGE_PIXELS is None
+                      else 2 * max(1, Image.MAX_IMAGE_PIXELS))
+        max_metadata_bytes = (0 if MAX_METADATA_BYTES is None
+                              else max(1, MAX_METADATA_BYTES))
         try:
             heif_file = reader.open(
                 self.fp.read(), apply_transformations=apply_transformations,
-                max_pixels=max_pixels, max_metadata_bytes=MAX_METADATA_BYTES)
+                max_pixels=max_pixels, max_metadata_bytes=max_metadata_bytes)
         except HeifError as e:
             raise SyntaxError(str(e))
-        heif_file.set_max_pixels(max_pixels)
-
         _extract_heif_exif(heif_file)
 
         if apply_transformations:
