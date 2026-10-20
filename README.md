@@ -145,6 +145,26 @@ pip install --no-build-isolation .
 ```
 
 
+## Releases
+
+Update the version in `pyproject.toml` and the changelog, commit, and push.
+Wait for CI to pass, then download the wheels, build the source distribution,
+and check the release files:
+
+```bash
+make -C dist prepare
+```
+
+Files are saved in `dist/<version>/`. Upload them to PyPI locally:
+
+```bash
+make -C dist upload
+```
+
+These commands require Python 3.11+, `build`, `twine`, and an authenticated
+GitHub CLI (`gh`).
+
+
 ## Changelog
 
 ### 0.9.0
